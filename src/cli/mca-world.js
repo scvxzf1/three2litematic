@@ -353,11 +353,16 @@ export async function readWorldMetadata(worldPath) {
  */
 export async function discoverMinecraftWorlds() {
   const home = os.homedir();
-  const mcRoots = [
+  const mcRoots = new Set([
     path.join(home, '.minecraft'),
     path.resolve(PROJECT_ROOT, '../HMCL/.minecraft'),
     path.resolve(PROJECT_ROOT, '../.minecraft'),
-  ];
+  ]);
+
+  if (process.platform === 'win32' && process.env.APPDATA) {
+    mcRoots.add(path.join(process.env.APPDATA, '.minecraft'));
+    mcRoots.add(path.join(process.env.APPDATA, 'HMCL', '.minecraft'));
+  }
 
   const candidateSaveDirs = [];
   for (const mcRoot of mcRoots) {

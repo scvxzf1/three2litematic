@@ -1,4 +1,6 @@
 node_modules/
+dist/
+.cache/
 
 # Runtime-generated caches
 library/.cache/

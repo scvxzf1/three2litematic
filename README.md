@@ -22,7 +22,21 @@
 
 ## 🚀 快速开始
 
-### 0. 从应用菜单启动（Linux / KDE）
+### 0. Windows 便携版
+
+从 [Releases](https://github.com/scvxzf1/three2litematic/releases) 下载 `three2litematic-*-win-x64.zip`，解压到任意可写目录后双击 `Start-three2litematic.bat` 即可。发布包内置 Node.js 运行时，无需另外安装 Node.js；浏览器会自动打开 `http://127.0.0.1:28741/`。
+
+命令行用法：
+
+```bat
+three2litematic.cmd --help
+three2litematic.cmd convert examples\cozy-lantern-tower.html -o cozy-lantern-tower.litematic
+three2litematic.cmd worlds
+```
+
+Windows 下会自动扫描官方启动器的 `%APPDATA%\.minecraft\saves` 以及 HMCL 的 `%APPDATA%\HMCL\.minecraft\saves`。
+
+### 1. 从应用菜单启动（Linux / KDE）
 
 已安装 **three2litematic 工作台** 应用菜单快捷方式。点击后会打开 Konsole，自动启动本地前后端并显示实时日志，同时打开 `http://127.0.0.1:28741/`；关闭该终端会自动停止项目服务。
 
@@ -32,7 +46,7 @@
 ./scripts/launch-desktop.sh
 ```
 
-### 1. 启动 Web 可视化预览工作台
+### 2. 启动 Web 可视化预览工作台
 
 ```bash
 npm run serve
@@ -48,7 +62,7 @@ npm run serve
 - 选择目标格式后点击 **🔍 预览格式**，先查看尺寸、方块数、目标版本等轻量摘要；点击下载时才在内存中转写一次，并提示实际文件大小，不生成临时文件
 - 一键下载 `.litematic` / `.schem` / `.mcfunction` 蓝图，或切入 **🗺️ 放入存档** 面板，在 **2D 等高阴影地形图** 上直接拖拽选点、旋转 `0°/90°/180°/270°`、自动贴合地表高度并将建筑直接写入 Minecraft 存档区块（免进游戏粘贴不卡顿，自带 `.mca` 区域文件自动备份与一键无损回滚）！
 
-### 2. CLI 命令行转换、存档地图直写与回滚
+### 3. CLI 命令行转换、存档地图直写与回滚
 
 ```bash
 # 扫描发现本地所有 Minecraft Java 版存档（支持 .minecraft 与 HMCL 版本隔离目录）
@@ -93,7 +107,7 @@ npm run convert -- ./examples/cozy-lantern-tower.html --disable-family wool --ov
 npm run inspect -- ./examples/cozy-lantern-tower.litematic
 ```
 
-### 3. 使用配套项目级 Skill 生成新作
+### 4. 使用配套项目级 Skill 生成新作
 
 在本目录 `/mnt/SD_Dataset/three2litematic` 下打开工作区对话，项目级 Skill（`.agents/skills/three-voxel-schematic/SKILL.md`）会自动被发现。你可以直接对 Agent 说：
 
