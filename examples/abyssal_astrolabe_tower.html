@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Abyssal_Astrolabe_Tower</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #080711; font-family: system-ui, sans-serif; }
+    #hud { position: fixed; left: 14px; bottom: 14px; z-index: 10; color: #eadfff; background: rgba(12, 8, 25, .82); border: 1px solid rgba(190, 137, 255, .35); border-radius: 8px; padding: 8px 12px; font-size: 12px; pointer-events: none; }
+  </style>
+  <script type="importmap">
+  { "imports": { "three": "https://unpkg.com/three@0.187.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.187.0/examples/jsm/" } }
+  </script>
+</head>
+<body>
+  <div id="hud">正在唤醒深渊星盘高塔...</div>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    function hash3(x, y, z) {
+      let h = (x * 374761393 + y * 668265263 + z * 2147483647) | 0;
+      h = ((h ^ (h >> 13)) * 1274126177) | 0;
+      return ((h ^ (h >> 16)) >>> 0) / 4294967295;
+    }
+
+    class VoxelWorld {
+      constructor(meta = {}) {
+        this.name = meta.name || 'Voxel_Build';
+        this.author = meta.author || 'AI_Architect';
+        this.description = meta.description || '';
+        this.cells = new Map();
+      }
+      _resolve(m, x, y, z) { return typeof m === 'function' ? m(x, y, z) : m; }
+      set(x, y, z, mat) {
+        if (!mat) return;
+        const ix = Math.round(x), iy = Math.round(y), iz = Math.round(z);
+        const entry = typeof mat === 'string' ? { color: mat } : mat;
+        this.cells.set(`${ix},${iy},${iz}`, { x: ix, y: iy, z: iz, ...entry });
+      }
+      del(x, y, z) { this.cells.delete(`${Math.round(x)},${Math.round(y)},${Math.round(z)}`); }
+      fillBox(x0, y0, z0, x1, y1, z1, m) {
+        for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++)
+          for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++)
+            for (let z = Math.min(z0, z1); z <= Math.max(z0, z1); z++)
+              this.set(x, y, z, this._resolve(m, x, y, z));
+      }
+      hollowBox(x0, y0, z0, x1, y1, z1, m) {
+        const ax = Math.min(x0, x1), bx = Math.max(x0, x1);
+        const ay = Math.min(y0, y1), by = Math.max(y0, y1);
+        const az = Math.min(z0, z1), bz = Math.max(z0, z1);
+        for (let x = ax; x <= bx; x++) for (let y = ay; y <= by; y++) for (let z = az; z <= bz; z++) {
+          if (x === ax || x === bx || y === ay || y === by || z === az || z === bz) this.set(x, y, z, this._resolve(m, x, y, z));
+        }
+      }
+      cylinder(cx, y0, cz, r, h, m, hollow = false) {
+        const r2 = r * r, innerR2 = Math.max(0, (r - 1.15) * (r - 1.15));
+        for (let dy = 0; dy < h; dy++) {
+          for (let dx = -Math.ceil(r); dx <= Math.ceil(r); dx++) {
+            for (let dz = -Math.ceil(r); dz <= Math.ceil(r); dz++) {
+              const d2 = dx * dx + dz * dz;
+              if (d2 <= r2 && (!hollow || d2 >= innerR2)) {
+                this.set(cx + dx, y0 + dy, cz + dz, this._resolve(m, cx + dx, y0 + dy, cz + dz));
+              }
+            }
+          }
+        }
+      }
+      sphere(cx, cy, cz, r, m) {
+        const r2 = r * r, R = Math.ceil(r);
+        for (let dx = -R; dx <= R; dx++) for (let dy = -R; dy <= R; dy++) for (let dz = -R; dz <= R; dz++) {
+          if (dx * dx + dy * dy + dz * dz <= r2) this.set(cx + dx, cy + dy, cz + dz, this._resolve(m, cx + dx, cy + dy, cz + dz));
+        }
+      }
+      line(x0, y0, z0, x1, y1, z1, m) {
+        const steps = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0, z1 - z0) * 2));
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          this.set(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, z0 + (z1 - z0) * t, m);
+        }
+      }
+      exportData() { return { name: this.name, author: this.author, description: this.description, voxels: Array.from(this.cells.values()) }; }
+      mountToScene(scene) {
+        const unitGeo = new THREE.BoxGeometry(1, 1, 1), groups = new Map();
+        let minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+        const solid = (v) => Boolean(v && (v.opacity ?? 1) >= .95);
+        for (const v of this.cells.values()) {
+          minX = Math.min(minX, v.x); maxX = Math.max(maxX, v.x); minY = Math.min(minY, v.y); maxY = Math.max(maxY, v.y); minZ = Math.min(minZ, v.z); maxZ = Math.max(maxZ, v.z);
+          if (solid(v) && solid(this.cells.get(`${v.x + 1},${v.y},${v.z}`)) && solid(this.cells.get(`${v.x - 1},${v.y},${v.z}`)) && solid(this.cells.get(`${v.x},${v.y + 1},${v.z}`)) && solid(this.cells.get(`${v.x},${v.y - 1},${v.z}`)) && solid(this.cells.get(`${v.x},${v.y},${v.z + 1}`)) && solid(this.cells.get(`${v.x},${v.y},${v.z - 1}`))) continue;
+          const key = `${v.color}|${v.opacity ?? 1}|${v.emissive ?? ''}|${v.isLight ? 1 : 0}|${v.block ?? ''}`;
+          if (!groups.has(key)) groups.set(key, { proto: v, items: [] });
+          groups.get(key).items.push(v);
+        }
+        const root = new THREE.Group(), matrix = new THREE.Matrix4();
+        for (const { proto, items } of groups.values()) {
+          const glass = (proto.opacity ?? 1) < .85, light = Boolean(proto.isLight || proto.emissive);
+          const material = new THREE.MeshStandardMaterial({ color: new THREE.Color(proto.color || '#ccc'), roughness: glass ? .15 : .86, metalness: .06, transparent: glass, opacity: proto.opacity ?? 1, emissive: light ? new THREE.Color(proto.emissive || proto.color) : new THREE.Color(0), emissiveIntensity: light ? (proto.emissiveIntensity ?? 1) : 0 });
+          if (proto.block) material.userData.block = proto.block;
+          const inst = new THREE.InstancedMesh(unitGeo, material, items.length);
+          inst.castShadow = !glass; inst.receiveShadow = true;
+          items.forEach((v, i) => { matrix.makeTranslation(v.x + .5, v.y + .5, v.z + .5); inst.setMatrixAt(i, matrix); });
+          inst.instanceMatrix.needsUpdate = true; root.add(inst);
+        }
+        scene.add(root);
+        return { center: new THREE.Vector3((minX + maxX + 1) * .5, (minY + maxY + 1) * .43, (minZ + maxZ + 1) * .5), size: new THREE.Vector3(maxX - minX + 1, maxY - minY + 1, maxZ - minZ + 1) };
+      }
+    }
+
+    const world = new VoxelWorld({
+      name: 'Abyssal_Astrolabe_Tower',
+      description: 'A dark medieval five-tower forbidden astrolabe citadel with magical rings and floating relics',
+    });
+
+    const MAT = {
+      bedrock:   { color: '#17151d', block: 'minecraft:deepslate_bricks' },
+      deep:      { color: '#2b2931', block: 'minecraft:deepslate_tiles' },
+      brick:     { color: '#39333e', block: 'minecraft:polished_blackstone_bricks' },
+      weathered: { color: '#464647', block: 'minecraft:deepslate_bricks' },
+      obsidian:  { color: '#100b18', block: 'minecraft:obsidian' },
+      crying:    { color: '#371846', block: 'minecraft:crying_obsidian' },
+      basalt:    { color: '#302a31', block: 'minecraft:polished_blackstone_bricks' },
+      iron:      { color: '#302a31', block: 'minecraft:polished_blackstone_bricks' },
+      purple:    { color: '#8d3fb1', opacity: .58, block: 'minecraft:purple_stained_glass' },
+      magenta:   { color: '#ca43ad', opacity: .5, block: 'minecraft:magenta_stained_glass' },
+      amethyst:  { color: '#a05bd0', block: 'minecraft:amethyst_block' },
+      voidLight: { color: '#c56bea', emissive: '#b72dff', emissiveIntensity: 1.25, isLight: true, block: 'minecraft:sea_lantern' },
+      soulLight: { color: '#86d8d9', emissive: '#3ee8ff', emissiveIntensity: 1.15, isLight: true, block: 'minecraft:soul_lantern' },
+      redLight:  { color: '#8f2938', emissive: '#ff2547', emissiveIntensity: .9, isLight: true, block: 'minecraft:redstone_lamp' },
+    };
+
+    function weathered(x, y, z) {
+      const n = hash3(x, y, z);
+      if (y < 8 && n < .12) return MAT.weathered;
+      if (n < .055) return MAT.basalt;
+      return MAT.deep;
+    }
+
+    function ring(cx, cy, cz, radius, u, v, material, segments = 96) {
+      for (let i = 0; i < segments; i++) {
+        const a = (Math.PI * 2 * i) / segments;
+        world.set(cx + Math.cos(a) * radius * u.x + Math.sin(a) * radius * v.x, cy + Math.cos(a) * radius * u.y + Math.sin(a) * radius * v.y, cz + Math.cos(a) * radius * u.z + Math.sin(a) * radius * v.z, material);
+      }
+    }
+
+    function battlements(cx, y, cz, radius, material) {
+      for (let i = 0; i < 16; i++) {
+        const a = (Math.PI * 2 * i) / 16;
+        if (i % 2 === 0) world.set(cx + Math.round(Math.cos(a) * radius), y, cz + Math.round(Math.sin(a) * radius), material);
+      }
+    }
+
+    function steppedTower(cx, cz, kind) {
+      const main = kind === 'main';
+      const tiers = main
+        ? [[4, 13, 15], [17, 13, 13], [30, 13, 11], [43, 13, 9], [56, 13, 7], [69, 13, 5], [82, 10, 4]]
+        : [[4, 12, 10], [16, 11, 8], [27, 11, 7], [38, 11, 6], [49, 9, 5]];
+      const material = (x, y, z) => main ? weathered(x, y, z) : (hash3(x, y, z) < .1 ? MAT.brick : MAT.deep);
+
+      world.fillBox(cx - tiers[0][2] - 3, 2, cz - tiers[0][2] - 3, cx + tiers[0][2] + 3, 2, cz + tiers[0][2] + 3, MAT.bedrock);
+      for (const [start, height, radius] of tiers) {
+        const end = start + height - 1;
+        // Hollow square chambers create the unmistakable wide-bottom / narrow-top silhouette.
+        world.hollowBox(cx - radius, start, cz - radius, cx + radius, end, cz + radius, material);
+        // Broad projecting floor and cornice at every level.
+        world.fillBox(cx - radius - 2, start - 1, cz - radius - 2, cx + radius + 2, start - 1, cz + radius + 2, MAT.brick);
+        world.fillBox(cx - radius - 1, end, cz - radius - 1, cx + radius + 1, end, cz + radius + 1, MAT.obsidian);
+        for (const [sx, sz] of [[-1, -1], [-1, 1], [1, -1], [1, 1]]) {
+          world.fillBox(cx + sx * (radius + 1), start, cz + sz * (radius + 1), cx + sx * (radius + 2), end, cz + sz * (radius + 2), MAT.obsidian);
+        }
+        // Deep recessed windows on each face, with a glowing rune at each tier.
+        const windowY = start + Math.max(3, Math.floor(height * .55));
+        for (let d = -1; d <= 1; d++) {
+          world.set(cx + d, windowY, cz - radius, MAT.purple);
+          world.set(cx + d, windowY + 1, cz - radius, MAT.purple);
+          world.set(cx + d, windowY, cz + radius, MAT.purple);
+          world.set(cx + d, windowY + 1, cz + radius, MAT.purple);
+          world.set(cx - radius, windowY, cz + d, MAT.purple);
+          world.set(cx + radius, windowY, cz + d, MAT.purple);
+        }
+        world.set(cx, windowY + 2, cz - radius, MAT.soulLight);
+        world.set(cx, windowY + 2, cz + radius, MAT.soulLight);
+        world.set(cx - radius, windowY + 1, cz, MAT.soulLight);
+        world.set(cx + radius, windowY + 1, cz, MAT.soulLight);
+      }
+
+      const top = tiers[tiers.length - 1][0] + tiers[tiers.length - 1][1];
+      const capRadius = tiers[tiers.length - 1][2] + 2;
+      world.fillBox(cx - capRadius, top, cz - capRadius, cx + capRadius, top, cz + capRadius, MAT.brick);
+      // Stepped square roof, rather than a cone, continues the architectural taper.
+      const roofLayers = main ? 13 : 10;
+      for (let i = 0; i < roofLayers; i++) {
+        const roofRadius = Math.max(1, capRadius - Math.floor(i * capRadius / roofLayers));
+        world.fillBox(cx - roofRadius, top + i, cz - roofRadius, cx + roofRadius, top + i, cz + roofRadius, i % 3 === 0 ? MAT.crying : MAT.obsidian);
+        if (i === 0 || i === 5 || i === 9) world.fillBox(cx - roofRadius - 1, top + i, cz - roofRadius - 1, cx + roofRadius + 1, top + i, cz + roofRadius + 1, MAT.brick);
+      }
+      world.set(cx, top + roofLayers, cz, MAT.voidLight);
+      world.set(cx, top + roofLayers + 1, cz, MAT.amethyst);
+      world.set(cx, top + roofLayers + 2, cz, MAT.voidLight);
+      // Four tall corner spires emphasize the vertical profile of each tiered tower.
+      for (const [sx, sz] of [[-1, -1], [-1, 1], [1, -1], [1, 1]]) {
+        world.fillBox(cx + sx * (capRadius - 1), top, cz + sz * (capRadius - 1), cx + sx * capRadius, top + roofLayers + 2, cz + sz * capRadius, MAT.obsidian);
+        world.set(cx + sx * capRadius, top + roofLayers + 3, cz + sz * capRadius, MAT.soulLight);
+      }
+    }
+
+    // A broad ruined terrace makes the citadel feel anchored and playable.
+    world.cylinder(90, 0, 90, 88, 2, (x, y, z) => y === 0 ? MAT.bedrock : (hash3(x, y, z) < .18 ? MAT.weathered : MAT.deep));
+    world.cylinder(90, 2, 90, 86, 1, MAT.brick);
+    for (const [x, z] of [[8, 8], [172, 8], [8, 172], [172, 172], [90, 3], [90, 177]]) {
+      world.cylinder(x, 3, z, 2, 2, MAT.bedrock);
+      world.set(x, 5, z, MAT.soulLight);
+    }
+
+    // Five-tower dark citadel: one dominant central tower and four lower arcane pylons.
+    steppedTower(90, 90, 'main');
+    steppedTower(90, 15, 'north');
+    steppedTower(165, 90, 'east');
+    steppedTower(90, 165, 'south');
+    steppedTower(15, 90, 'west');
+
+    // Openings and a cross-shaped system of elevated bridges.
+    for (let y = 4; y <= 9; y++) { for (let dx = -1; dx <= 1; dx++) world.del(90 + dx, y, 75); }
+    for (const [cx, cz, side] of [[90, 15, 'south'], [165, 90, 'west'], [90, 165, 'north'], [15, 90, 'east']]) {
+      for (let y = 4; y <= 8; y++) for (let d = -1; d <= 1; d++) {
+        const x = side === 'east' ? cx + 10 : side === 'west' ? cx - 10 : cx + d;
+        const z = side === 'south' ? cz + 10 : side === 'north' ? cz - 10 : cz + d;
+        world.del(x, y, z);
+      }
+      const dx = Math.sign(90 - cx), dz = Math.sign(90 - cz);
+      const endX = 90 - dx * 14, endZ = 90 - dz * 14;
+      for (let i = 0; i < 3; i++) world.line(cx, 18 + i, cz, endX, 18 + i, endZ, i === 1 ? MAT.purple : MAT.brick);
+      world.line(cx, 21, cz, endX, 21, endZ, MAT.iron);
+    }
+
+    // Three intersecting magical rings form the tower's forbidden astrolabe.
+    ring(90, 68, 90, 25, { x: 1, y: 0, z: 0 }, { x: 0, y: 1, z: 0 }, MAT.obsidian);
+    ring(90, 68, 90, 25, { x: 0, y: 0, z: 1 }, { x: 0, y: 1, z: 0 }, MAT.crying);
+    ring(90, 84, 90, 21, { x: 1, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }, MAT.purple);
+    ring(90, 68, 90, 21, { x: .92, y: .38, z: 0 }, { x: -.32, y: .77, z: .56 }, MAT.amethyst, 80);
+    ring(90, 68, 90, 14, { x: .7, y: .7, z: 0 }, { x: 0, y: 0, z: 1 }, MAT.magenta, 72);
+    for (const a of [0, Math.PI / 2, Math.PI, Math.PI * 1.5]) {
+      const x = Math.round(90 + Math.cos(a) * 25), z = Math.round(90 + Math.sin(a) * 25);
+      world.line(x, 61, z, x, 75, z, MAT.iron);
+      world.set(x, 68, z, MAT.voidLight);
+    }
+
+    // Four energy conduits link the secondary towers to the central ring.
+    for (const [x, z] of [[90, 15], [165, 90], [90, 165], [15, 90]]) {
+      world.line(x, 57, z, 90, 73, 90, MAT.purple);
+      world.line(x, 58, z, 90, 75, 90, MAT.soulLight);
+      world.set(x, 56, z, MAT.voidLight);
+    }
+
+    // Small floating relics orbit the astrolabe; all are non-gravity blocks.
+    const relics = [[120, 70, 58], [45, 74, 122], [132, 88, 132], [48, 82, 48], [139, 61, 112], [39, 66, 38]];
+    for (const [x, y, z] of relics) {
+      world.sphere(x, y, z, 2, MAT.obsidian);
+      world.set(x, y + 2, z, MAT.amethyst);
+      world.set(x, y + 3, z, MAT.voidLight);
+      world.line(x - 2, y, z, x + 2, y, z, MAT.crying);
+      world.line(x, y, z - 2, x, y, z + 2, MAT.crying);
+    }
+
+    // Central floating forbidden core and a small open observatory platform.
+    world.cylinder(90, 100, 90, 7, 1, MAT.obsidian);
+    ring(90, 103, 90, 6, { x: 1, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }, MAT.iron, 48);
+    world.sphere(90, 104, 90, 3, MAT.amethyst);
+    world.set(90, 104, 90, MAT.voidLight);
+    for (const y of [96, 98, 100]) { world.set(90, y, 86, MAT.soulLight); world.set(90, y, 94, MAT.soulLight); }
+
+    // A broken ritual path and four small rune shrines complete the ground story.
+    for (let z = 2; z <= 25; z++) {
+      world.set(90, 3, z, z % 3 === 0 ? MAT.crying : MAT.brick);
+      if (z % 4 === 0) world.set(89, 4, z, MAT.soulLight);
+    }
+    for (const [x, z] of [[45, 45], [135, 45], [135, 135], [45, 135]]) {
+      world.cylinder(x, 3, z, 3, 1, MAT.obsidian);
+      ring(x, 4, z, 2, { x: 1, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }, MAT.magenta, 24);
+      world.set(x, 4, z, MAT.redLight);
+    }
+
+    window.__VOXEL_DATA__ = world.exportData();
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color('#080711');
+    const { center, size } = world.mountToScene(scene);
+    const maxDim = Math.max(size.x, size.y, size.z, 16);
+    const camera = new THREE.PerspectiveCamera(44, window.innerWidth / window.innerHeight, .1, 2000);
+    camera.position.set(center.x + maxDim * 1.22, center.y + maxDim * .88, center.z + maxDim * 1.22);
+    const realtimeShadows = world.cells.size <= 9000;
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight); renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); renderer.shadowMap.enabled = realtimeShadows; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05; document.body.appendChild(renderer.domElement);
+    const controls = new OrbitControls(camera, renderer.domElement); controls.target.copy(center); controls.enableDamping = true;
+    scene.add(new THREE.HemisphereLight(0x766b9e, 0x0b0810, .7));
+    const moon = new THREE.DirectionalLight(0x9fa9ff, 1.15); moon.position.set(center.x - maxDim, center.y + maxDim * 1.4, center.z + maxDim * .5); moon.castShadow = realtimeShadows; scene.add(moon);
+    const purpleFill = new THREE.PointLight(0xa92cff, 2.4, 180); purpleFill.position.set(90, 72, 90); scene.add(purpleFill);
+    document.getElementById('hud').textContent = `${world.name} · ${size.x}×${size.y}×${size.z} · ${world.cells.size} 方块 · 拖拽旋转 / 滚轮缩放`;
+    window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+    renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+  </script>
+</body>
+</html>

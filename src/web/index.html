@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#141821" />
+  <title>three2litematic — Three.js 像素作品转 Minecraft 投影工作台</title>
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/src/web/assets/icon-32.png" />
+  <link rel="apple-touch-icon" sizes="192x192" href="/src/web/assets/icon-192.png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="stylesheet" href="/src/web/style.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "/node_modules/three/build/three.module.js",
+      "three/addons/": "/node_modules/three/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img class="brand-logo" src="/src/web/assets/icon-64.png" width="28" height="28" alt="three2litematic" />
+      <div class="brand-text">
+        <h1>three2litematic <span id="activeAssetBadge" class="active-asset-pill">内置示例</span></h1>
+        <p class="subtitle">Three.js → Litematica / WorldEdit 蓝图工作台</p>
+      </div>
+    </div>
+
+    <div class="toolbar-actions">
+      <button id="openLibraryBtn" class="btn btn-library" title="打开本地持久化资产库（搜索、分类、批量导出）">
+        📚 资产库 <span id="assetCountBadge" class="count-pill">0</span>
+      </button>
+
+      <button id="saveAssetBtn" class="btn btn-secondary" title="将当前场景、3D 缩略图及专属转换参数保存到本地 library/">
+        💾 存入资产库
+      </button>
+
+      <label class="btn btn-secondary" for="fileInput" title="支持单选或多选批量拖入 .html / .js / .json / .litematic / .schem">
+        📥 导入
+      </label>
+      <input id="fileInput" type="file" multiple accept=".html,.htm,.js,.json,.litematic,.schem" hidden />
+
+      <button id="openEditorBtn" class="btn btn-secondary">✏️ 代码</button>
+
+      <div class="view-tabs" role="tablist">
+        <button class="tab-btn active" data-view="mc">仅 MC</button>
+        <button class="tab-btn" data-view="split">分屏对比</button>
+        <button class="tab-btn" data-view="source">仅原场景</button>
+        <button class="tab-btn tab-world" data-view="world" title="读取本地 Minecraft 存档地形图，可视化选点并将建筑直接写入地图">🗺️ 放入存档</button>
+      </div>
+
+      <div class="export-combo">
+        <select id="exportFormatSelect" class="input-select export-fmt-select" title="选择导出的蓝图格式">
+          <option value="litematic">.litematic (含缩略图)</option>
+          <option value="schem">.schem (WorldEdit)</option>
+          <option value="mcfunction">.mcfunction (原版命令)</option>
+        </select>
+        <button id="previewFormatBtn" class="btn btn-secondary" disabled title="先查看格式摘要，下载时再进行内存转换">
+          🔍 预览格式
+        </button>
+        <button id="exportBtn" class="btn btn-primary" disabled>📤 导出</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <!-- Left / Main Viewports -->
+    <section class="viewports only-mc" id="viewportsContainer">
+      <div class="pane" id="sourcePane">
+        <div class="pane-badge">原 Three.js 实时场景</div>
+        <iframe id="sourceFrame" title="Three.js Source Scene"></iframe>
+        <div id="sourcePlaceholder" class="placeholder hidden">
+          当前导入的是结构化 JSON 或蓝图文件（无原始 HTML 视图）
+        </div>
+      </div>
+
+      <div class="pane" id="mcPane">
+        <div class="pane-badge">
+          Minecraft 投影预览 <span id="statsBadge"></span>
+        </div>
+
+        <!-- Floating 3D Viewport Controls -->
+        <div class="viewport-hud-top">
+          <button id="syncCamBtn" class="hud-pill active" title="左右双视口旋转/缩放同步跟随">
+            🔗 双屏同步
+          </button>
+
+          <div class="hud-group" role="group" aria-label="光影模式">
+            <button class="hud-seg active" data-light="day" title="标准明亮白昼光">☀️ 白昼</button>
+            <button class="hud-seg" data-light="sunset" title="暖色斜阳黄昏光影">🌅 黄昏</button>
+            <button class="hud-seg" data-light="night" title="纯黑夜景（凸显发光方块点光源效果）">🌙 深夜</button>
+          </div>
+
+          <button id="renderStyleBtn" class="hud-pill active" title="切换 Minecraft 预览的颜色与材质显示">
+            🧱 材质模式
+          </button>
+          <button id="toggleGridPreviewBtn" class="hud-pill hidden" title="为大蓝图按需生成或释放 3D 网格">
+            🧊 渲染 3D 预览
+          </button>
+
+          <div class="hud-group" role="group" aria-label="快捷视角">
+            <button class="hud-seg" data-cam="iso" title="标准 45° 等轴测俯瞰视角">等轴</button>
+            <button class="hud-seg" data-cam="front" title="正视图 (+Z)">正视</button>
+            <button class="hud-seg" data-cam="side" title="右侧视图 (+X)">侧视</button>
+            <button class="hud-seg" data-cam="top" title="正顶视平面图 (+Y)">俯视</button>
+          </div>
+        </div>
+
+        <div id="mcCanvasHost" class="canvas-host">
+          <div id="deferredPreviewOverlay" class="deferred-preview-overlay hidden">
+            <div class="deferred-preview-card">
+              <div class="deferred-preview-icon">🧊</div>
+              <h3>蓝图已读取，3D 网格暂未生成</h3>
+              <p id="deferredPreviewStats" class="deferred-preview-stats"></p>
+              <p class="hint-text">轻量模式可先查看格式摘要并转换下载；生成完整 3D 模型会额外占用内存和显卡资源。</p>
+              <button id="showGridPreviewBtn" class="btn btn-primary">▶ 按需生成 3D 预览</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Floating Bottom-Left Voxel Hover / Selection Inspector -->
+        <div id="voxelInspector" class="voxel-inspector hidden">
+          <span id="inspSwatch" class="insp-swatch"></span>
+          <div class="insp-body">
+            <div class="insp-main">
+              <strong id="inspName">-</strong>
+              <code id="inspCoord">X:0 Y:0 Z:0</code>
+            </div>
+            <div class="insp-sub">
+              <span id="inspId">minecraft:stone</span>
+              <span id="inspActionHint" class="insp-hint">点击透视高亮同类块</span>
+            </div>
+          </div>
+          <button id="clearHighlightBtn" class="insp-clear hidden" title="取消同种方块高亮">✕ 取消高亮</button>
+        </div>
+
+        <!-- Litematica Layer Slice Bar -->
+        <div class="layer-bar">
+          <button id="sliceModeBtn" class="btn-mini" title="切换“累积显示 1~Y 层”或“仅看单层第 Y 层”">
+            📚 累积层
+          </button>
+          <button id="layerDownBtn" class="btn-step" title="下一层 (快捷键 ↓)">−</button>
+          <input id="layerSlider" type="range" min="1" max="1" value="1" />
+          <button id="layerUpBtn" class="btn-step" title="上一层 (快捷键 ↑)">+</button>
+          <span id="layerLabel">全部显示</span>
+          <button id="resetCameraBtn" class="btn-mini" title="重置居中相机">🎯 居中</button>
+        </div>
+      </div>
+
+      <!-- Offline 2D Minecraft Save World Map Editor Pane -->
+      <div class="pane world-pane" id="worldPane">
+        <div class="world-hud-top">
+          <div class="world-hud-left">
+            <span class="world-pane-title">🗺️ <strong id="worldMapTitleBadge">未加载存档</strong></span>
+            <div class="hud-group">
+              <button id="jumpPlayerBtn" class="hud-seg" title="跳转并聚焦到玩家所在坐标">🧭 玩家</button>
+              <button id="jumpSpawnBtn" class="hud-seg" title="跳转并聚焦到世界出生点">🏠 出生点</button>
+              <button id="focusFootprintBtn" class="hud-seg" title="聚焦到当前待放置建筑框">🎯 选框</button>
+              <button id="rescanCenterBtn" class="hud-seg" title="以当前视野中心重新加载周边 512×512 格地形">📡 加载视野</button>
+            </div>
+          </div>
+
+          <div class="world-hud-right">
+            <div class="world-view-nav" title="只移动地图视角，不改变建筑选点">
+              <span class="world-view-nav-label">视角 TP</span>
+              <label>X<input id="mapGotoXInput" type="number" step="1" placeholder="X" /></label>
+              <label>Z<input id="mapGotoZInput" type="number" step="1" placeholder="Z" /></label>
+              <button id="mapGotoBtn" class="hud-seg world-nav-btn" title="跳转视角到指定 X/Z，并以目标点为中心">跳转</button>
+            </div>
+            <button id="mapViewResetBtn" class="hud-pill" title="回到当前选框中心并恢复默认缩放">↺ 复位视图</button>
+            <button id="toggleChunkGridBtn" class="hud-pill active" title="显示/隐藏 16×16 区块网格线">🏁 区块线</button>
+            <div class="hud-group">
+              <button id="mapZoomOutBtn" class="hud-seg" title="缩小地图">−</button>
+              <button id="mapZoomResetBtn" class="hud-seg" title="重置缩放比例">100%</button>
+              <button id="mapZoomInBtn" class="hud-seg" title="放大地图">＋</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="worldCanvasWrap" class="world-canvas-wrap">
+          <canvas id="worldMapCanvas"></canvas>
+          <div id="worldEmptyOverlay" class="world-empty-overlay">
+            <div class="world-empty-card">
+              <div class="world-empty-icon">🗺️</div>
+              <h3>离线存档地图直写编辑器</h3>
+              <p>免进游戏开投影粘贴，避免大型建筑卡顿。支持 <strong>MC 1.16.5 ~ 1.21.11+</strong> 全系存档格式，自带区域文件自动备份与一键回滚。</p>
+              <p class="hint-text">请在右侧面板选择自动发现的本地存档，或输入目录路径后点击「加载地形」生成静态预览。</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="world-status-bar">
+          <span id="worldCursorInfo">指针: 移动鼠标查看区块与地表高度</span>
+          <span id="worldFootprintInfo">左键点击地面定位 / 拖拽建筑框微调 / 拖拽空白处平移地图 / 滚轮缩放</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right Control & Material Sidebar -->
+    <aside class="sidebar">
+      <div id="converterSidebarWrap" class="sidebar-mode-wrap">
+      <div class="panel-section">
+        <!-- Reusable Style & Override Presets Bar -->
+        <div class="preset-bar">
+          <select id="stylePresetSelect" class="input-select preset-select" title="一键套用可复用的调色、过滤与手动替换方案">
+            <option value="">🎨 套用调色/替换预设...</option>
+          </select>
+          <button id="openSavePresetBtn" class="btn-mini" title="将当前的材质过滤、调色与手动替换表存为可复用预设">➕ 存预设</button>
+          <button id="deletePresetBtn" class="btn-mini hidden" title="删除选中的自定义预设">🗑️</button>
+        </div>
+
+        <div id="savePresetInline" class="inline-form hidden">
+          <input id="newPresetNameInput" type="text" placeholder="输入预设名 (如: 日式青瓦白墙)..." />
+          <button id="confirmSavePresetBtn" class="btn-mini active-mode">保存</button>
+          <button id="cancelSavePresetBtn" class="btn-mini">取消</button>
+        </div>
+
+        <div class="param-tabs" role="tablist">
+          <button class="param-tab active" data-ptab="basic">🎛️ 基础与材质类</button>
+          <button class="param-tab" data-ptab="advanced">🎨 几何半砖与调色</button>
+        </div>
+
+        <!-- Tab 1: Basic & Material Families -->
+        <div id="paramPaneBasic" class="param-pane">
+          <label class="field">
+            <span>作品 / 蓝图名称</span>
+            <input id="schemNameInput" type="text" value="ThreeJS_Voxel_Build" placeholder="输入资产与蓝图名称" />
+          </label>
+
+          <label class="field">
+            <span>目标 MC 版本与方块集</span>
+            <select id="presetSelect" class="input-select">
+              <option value="1.21">MC 1.21.x (现代全方块 · 推荐)</option>
+              <option value="1.20.1">MC 1.20.1 (主流整合包)</option>
+              <option value="1.16.5">MC 1.16.5+ (高兼容经典集)</option>
+              <option value="classic">纯基础像素画集 (混凝土/陶瓦/羊毛/玻璃)</option>
+            </select>
+          </label>
+
+          <div class="field-row">
+            <label class="field">
+              <span>提取/缩放模式</span>
+              <select id="scaleModeSelect" class="input-select">
+                <option value="auto">自动识别 (推荐)</option>
+                <option value="1:1">1:1 原生整数网格</option>
+                <option value="fit">按目标边长体素化</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>目标最大边长: <strong id="targetSizeVal">64</strong></span>
+              <input id="targetSizeInput" type="range" min="16" max="160" step="4" value="64" />
+            </label>
+          </div>
+
+          <div class="family-filter-box">
+            <div class="family-filter-header">
+              <span>材质大类开关 (点击禁用/启用整类)</span>
+              <button id="resetFamiliesBtn" class="btn-link hidden">全开</button>
+            </div>
+            <div id="familyChips" class="family-chips"></div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Half-Slabs, Dithering, Color Grading & Filters -->
+        <div id="paramPaneAdvanced" class="param-pane hidden">
+          <div class="toggles">
+            <label class="checkbox-row highlight-feature">
+              <input id="useSlabsChk" type="checkbox" />
+              <span>🧱 半砖 (0.5 格台阶) 坡面与拱顶拟合</span>
+            </label>
+            <label class="checkbox-row">
+              <input id="hollowInteriorChk" type="checkbox" />
+              <span>🕳️ 自动掏空实心内部 (节省生存材料)</span>
+            </label>
+            <label class="checkbox-row">
+              <input id="excludeGravityChk" type="checkbox" checked />
+              <span>排除重力方块 (防沙子/粉末悬空掉落)</span>
+            </label>
+            <label class="checkbox-row">
+              <input id="survivalFriendlyChk" type="checkbox" checked />
+              <span>生存友好 (排除钻石块/下界合金等昂贵块)</span>
+            </label>
+            <label class="checkbox-row">
+              <input id="preferSceneChk" type="checkbox" />
+              <span>强制几何体采样 (忽略 __VOXEL_DATA__)</span>
+            </label>
+          </div>
+
+          <div class="grading-box">
+            <div class="family-filter-header">
+              <span>色彩微调与 3D 拜耳混色抖动</span>
+              <button id="resetGradingBtn" class="btn-link">重置调色</button>
+            </div>
+
+            <div class="slider-compact">
+              <span>亮度 <strong id="brightnessVal">0</strong></span>
+              <input id="brightnessInput" type="range" min="-40" max="40" step="2" value="0" />
+            </div>
+            <div class="slider-compact">
+              <span>饱和度 <strong id="saturationVal">100%</strong></span>
+              <input id="saturationInput" type="range" min="0" max="180" step="5" value="100" />
+            </div>
+            <div class="slider-compact">
+              <span>3D 抖动 <strong id="ditherVal">0%</strong></span>
+              <input id="ditherInput" type="range" min="0" max="100" step="5" value="0" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-section materials-section">
+        <div class="materials-header">
+          <h2>📦 材料清单 <span id="materialSummary"></span></h2>
+          <div class="mat-header-actions">
+            <button id="materialRenderStyleBtn" class="btn-link render-style-toggle" title="切换材料清单与 Minecraft 预览的颜色/材质显示">🧱 材质</button>
+            <button id="copyMaterialsBtn" class="btn-link" title="复制 Markdown 备料清单">复制清单</button>
+            <button id="clearOverridesBtn" class="btn-link hidden" title="清空所有手动替换规则">重置替换</button>
+            <button id="clearDisabledBtn" class="btn-link hidden">恢复禁用</button>
+          </div>
+        </div>
+        <p class="hint-text">点行透视定位；点“替换”可手动指定任意目标方块；点“禁用”自动顺延。</p>
+        <div id="materialList" class="material-list"></div>
+      </div>
+      </div>
+
+      <!-- Dedicated World Placement & Rollback Sidebar (shown in 'world' view) -->
+      <div id="worldSidebarWrap" class="sidebar-mode-wrap hidden">
+        <div class="panel-section">
+          <div class="world-sec-header">
+            <h2>📂 目标 Minecraft 存档</h2>
+            <button id="refreshWorldsBtn" class="btn-mini" title="重新扫描本地 .minecraft / HMCL 存档目录">🔄 刷新扫描</button>
+          </div>
+
+          <label class="field">
+            <span>自动发现的本地存档</span>
+            <select id="worldSelect" class="input-select">
+              <option value="">-- 默认不选择 · 请选择本地存档 --</option>
+            </select>
+          </label>
+          <p class="hint-text">选择存档不会自动加载；加载后生成静态地图快照。写入或回滚后，离开地图页签时再自动刷新。</p>
+
+          <div class="field">
+            <span>存档目录路径 (含 <code>level.dat</code> 与 <code>region/</code>)</span>
+            <div class="world-path-row">
+              <input id="worldPathInput" type="text" placeholder="/path/to/.minecraft/saves/新的世界" />
+              <button id="loadWorldMapBtn" class="btn-mini active-mode" disabled>加载地形</button>
+            </div>
+          </div>
+
+          <div id="worldMetaBox" class="world-meta-box hidden">
+            <div class="world-meta-line">
+              <span id="worldVerBadge" class="world-ver-pill">MC 1.21</span>
+              <span id="worldHeightRangeText">高度: -64 ~ 319</span>
+            </div>
+            <div class="world-meta-coords">
+              <span id="worldSpawnText">🏠 出生点: 0, 64, 0</span>
+              <span id="worldPlayerText">🧭 玩家: -</span>
+            </div>
+            <div id="worldLockWarn" class="world-lock-warn hidden">
+              ⚠️ 检测到该存档可能正在游戏内打开！请先退回游戏主菜单再执行写入，否则修改会被游戏内存覆盖。
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-section">
+          <div class="world-sec-header">
+            <h2>📐 选点定位与朝向变换</h2>
+            <div class="world-quick-btns">
+              <button id="placeNearPlayerBtn" class="btn-link" title="将建筑放到玩家旁边 (+12 格)">📍 放玩家旁</button>
+              <button id="placeNearSpawnBtn" class="btn-link" title="将建筑放到世界出生点旁 (+12 格)">🏠 放出生点旁</button>
+            </div>
+          </div>
+
+          <div class="coord-grid-3">
+            <label class="field">
+              <span>起点 X (东西)</span>
+              <input id="placeXInput" type="number" step="1" value="0" />
+            </label>
+            <label class="field">
+              <span>基底 Y (高度)</span>
+              <input id="placeYInput" type="number" step="1" value="64" />
+            </label>
+            <label class="field">
+              <span>起点 Z (南北)</span>
+              <input id="placeZInput" type="number" step="1" value="0" />
+            </label>
+          </div>
+
+          <div class="ground-snap-box">
+            <label class="checkbox-row highlight-feature">
+              <input id="autoGroundChk" type="checkbox" checked />
+              <span>⛰️ 拖拽时自动贴合地表 (<span id="sampledGroundLabel">地表 Y=--</span>)</span>
+            </label>
+            <div class="ground-offset-row">
+              <span>离地偏移 ΔY (负值入土 / 正值浮空)</span>
+              <input id="groundOffsetInput" type="number" step="1" value="0" />
+            </div>
+            <div class="world-height-controls">
+              <label class="checkbox-row highlight-feature">
+                <input id="autoSinkChk" type="checkbox" checked />
+                <span>⬇️ 自动沉降，避免建筑顶部被裁切</span>
+              </label>
+              <label class="world-clearance-field">
+                <span>顶部留空层数 (Y)</span>
+                <input id="topClearanceInput" type="number" min="0" max="4096" step="1" value="0" />
+              </label>
+            </div>
+            <div id="worldHeightFitStatus" class="world-height-fit-status" role="status">
+              根据存档高度上限自动调整基底 Y。
+            </div>
+          </div>
+
+          <div class="field" style="margin-top:7px;">
+            <span>顺时针旋转角度 (连同楼梯/原木朝向属性同步旋转)</span>
+            <div class="rot-btn-group" id="rotBtnGroup">
+              <button class="rot-btn active" data-rot="0">0° 北</button>
+              <button class="rot-btn" data-rot="90">90° 东</button>
+              <button class="rot-btn" data-rot="180">180° 南</button>
+              <button class="rot-btn" data-rot="270">270° 西</button>
+            </div>
+          </div>
+
+          <div class="toggles" style="margin-top:6px;margin-bottom:4px;">
+            <label class="checkbox-row">
+              <input id="mirrorXChk" type="checkbox" />
+              <span>↔️ 沿 X 轴左右镜像翻转</span>
+            </label>
+            <label class="checkbox-row">
+              <input id="includeAirChk" type="checkbox" />
+              <span>🫧 写入内部空气方块 (建造地下室需挖空土层时勾选)</span>
+            </label>
+          </div>
+
+          <div class="void-fill-box">
+            <label class="checkbox-row highlight-feature">
+              <input id="fillVoidChk" type="checkbox" />
+              <span>🧱 启用空置域模式（按模型占用区块 XZ 范围）</span>
+            </label>
+            <div class="void-fill-fields">
+              <label class="field">
+                <span>填充方式</span>
+                <select id="fillModeSelect" class="input-select" disabled>
+                  <option value="solid">整段填充（从底部 Y 到模型基底）</option>
+                  <option value="base_hollow">一层底座 + 从基底向上清空</option>
+                </select>
+              </label>
+              <label class="field" id="fillBottomYField">
+                <span>底部 Y（从此高度填到模型基底）</span>
+                <input id="fillBottomYInput" type="number" step="1" value="-64" disabled />
+              </label>
+              <label class="field">
+                <span>底座材料</span>
+                <select id="fillMaterialSelect" class="input-select" disabled>
+                  <option value="minecraft:stone">石头</option>
+                  <option value="minecraft:cobblestone">圆石</option>
+                  <option value="minecraft:polished_deepslate">磨制深板岩</option>
+                  <option value="minecraft:deepslate_bricks">深板岩砖</option>
+                  <option value="minecraft:polished_andesite">磨制安山岩</option>
+                  <option value="minecraft:white_concrete">白色混凝土</option>
+                  <option value="minecraft:black_concrete">黑色混凝土</option>
+                </select>
+              </label>
+            </div>
+            <div class="void-fill-mode-note">
+              <span class="void-fill-mode-badge">写入模式</span>
+              <span>仅点击下方写入按钮后修改存档，勾选本项不会立即改动地图。</span>
+            </div>
+            <p id="voidFillHint" class="void-fill-hint">这是写入时的模式选择，不会在勾选时立即修改存档。普通模式会把底部 Y 到模型基底之间替换为底座材料；一层底座模式只在基底 Y-1 写一层材料，并从基底 Y 一直清空到世界最高 Y 后写入模型。</p>
+          </div>
+
+          <div class="world-safety-tip">
+            🛡️ 写入前请确保存档已退回主菜单。系统会自动备份受影响的 <code>.mca</code> 区域文件，随时可下方一键无损撤销。
+          </div>
+
+          <button id="commitPlaceBtn" class="btn btn-primary world-commit-btn" disabled>
+          ⚡ 写入存档地图 (自动备份)
+          </button>
+        </div>
+
+        <div class="panel-section materials-section">
+          <div class="materials-header backup-header-row">
+            <h2>⏪ 备份回档 <span id="backupCountLabel">(0 / 10)</span></h2>
+            <div class="backup-header-actions">
+              <label class="backup-cap-field" title="自动保留的最新备份份数上限（默认 10 份，超出自动删除最早备份）">
+                <span>上限</span>
+                <input id="maxBackupsInput" type="number" min="1" max="50" step="1" value="10" />
+              </label>
+              <button id="clearAllBackupsBtn" class="btn-mini btn-danger-outline hidden" title="仅删除全部备份快照以释放空间，不改动当前地图区块">🧹 清空</button>
+            </div>
+          </div>
+          <p id="backupSizeHint" class="hint-text">默认保留最新 10 份快照，超出自动删除；点“🗑️”仅删备份不回滚地图。</p>
+          <div id="worldBackupList" class="material-list"></div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- ==================== Asset Management Center Modal ==================== -->
+  <div id="assetLibraryModal" class="modal hidden">
+    <div class="modal-card library-card">
+      <div class="modal-header">
+        <div class="lib-title-row">
+          <img src="/src/web/assets/icon-64.png" width="24" height="24" alt="" style="border-radius:5px" />
+          <h3>本地资产管理中心</h3>
+          <span class="lib-path-hint">存储于 <code>library/assets/</code> · 刷新不丢失 · 支持专属参数记忆与批量导出</span>
+        </div>
+        <button id="closeLibraryBtn" class="btn-mini">✕ 关闭</button>
+      </div>
+
+      <div class="lib-toolbar">
+        <input id="libSearchInput" type="text" placeholder="🔍 搜索资产名称、格式或标签..." />
+
+        <div class="hud-group" id="libFilterTabs">
+          <button class="hud-seg active" data-libtab="all">全部</button>
+          <button class="hud-seg" data-libtab="user">📁 我的资产</button>
+          <button class="hud-seg" data-libtab="fav">⭐ 收藏</button>
+          <button class="hud-seg" data-libtab="builtin">🏛️ 内置示例</button>
+        </div>
+
+        <select id="libExtFilter" class="input-select">
+          <option value="all">全部格式</option>
+          <option value="html">Three.js 网页 (.html/.js)</option>
+          <option value="json">结构化体素 (.json)</option>
+          <option value="schem">MC 蓝图 (.litematic/.schem)</option>
+        </select>
+
+        <button id="saveAsCopyBtn" class="btn btn-secondary" title="将当前正在编辑的场景另存为一个新资产副本">
+          ➕ 当前场景另存新资产
+        </button>
+      </div>
+
+      <!-- Batch Selection & Export Strip -->
+      <div class="lib-batch-bar">
+        <label class="checkbox-row">
+          <input id="libSelectAllChk" type="checkbox" />
+          <span>全选当前列表 (<strong id="libSelectedCount">0</strong> 项已选)</span>
+        </label>
+
+        <div class="lib-batch-actions">
+          <select id="libBatchFormatSelect" class="input-select">
+            <option value="litematic">批量导出为 .litematic</option>
+            <option value="schem">批量导出为 .schem</option>
+            <option value="mcfunction">批量导出为 .mcfunction</option>
+          </select>
+          <button id="libBatchExportBtn" class="btn btn-primary" disabled>📦 批量打包导出</button>
+          <button id="libBatchDeleteBtn" class="btn btn-danger-outline" disabled>🗑️ 删除选中</button>
+        </div>
+      </div>
+
+      <div id="assetCardsGrid" class="asset-cards-grid"></div>
+    </div>
+  </div>
+
+  <!-- Manual Minecraft Block Replacement Picker Modal -->
+  <div id="blockPickerModal" class="modal hidden">
+    <div class="modal-card picker-card">
+      <div class="modal-header">
+        <h3 id="pickerTitle">🎨 手动替换方块</h3>
+        <button id="closePickerBtn" class="btn-mini">✕ 关闭</button>
+      </div>
+
+      <div class="picker-toolbar">
+        <input id="pickerSearchInput" type="text" placeholder="🔍 搜索中文名或英文 ID (例如: 苔藓 / 石砖 / 蛙明灯 / slab)..." />
+        <div class="picker-cats" id="pickerCats">
+          <button class="hud-seg active" data-pcat="all">全部</button>
+          <button class="hud-seg" data-pcat="solid">实心块</button>
+          <button class="hud-seg" data-pcat="slab">半砖台阶</button>
+          <button class="hud-seg" data-pcat="translucent">玻璃/冰</button>
+          <button class="hud-seg" data-pcat="emissive">光源</button>
+        </div>
+      </div>
+
+      <div id="pickerGrid" class="picker-grid"></div>
+    </div>
+  </div>
+
+  <!-- Code Paste / Live Editor Modal -->
+  <div id="editorModal" class="modal hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>✏️ 粘贴或编辑 Three.js HTML / JS / JSON 代码</h3>
+        <button id="closeEditorBtn" class="btn-mini">✕ 关闭</button>
+      </div>
+      <textarea id="codeTextarea" spellcheck="false" placeholder="在此粘贴 AI 生成的完整 Three.js HTML 代码..."></textarea>
+      <div class="modal-footer">
+        <span class="hint-text">支持标准 ES Module Three.js 网页、Skill 体素模板网页或体素 JSON</span>
+        <div>
+          <button id="applyCodeBtn" class="btn btn-primary">▶ 运行并转换预览</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- In-memory Format Preview Modal -->
+  <div id="formatPreviewModal" class="modal hidden">
+    <div class="modal-card format-preview-card">
+      <div class="modal-header">
+        <div>
+          <h3>🔍 格式转换预览</h3>
+          <p id="formatPreviewSubtitle" class="hint-text">轻量预览；确认下载时才在内存中转写</p>
+        </div>
+        <button id="closeFormatPreviewBtn" class="btn-mini">✕ 关闭</button>
+      </div>
+
+      <div id="formatPreviewLoading" class="format-preview-loading hidden">
+        <span class="spinner"></span>
+        <span>正在内存转写，请稍候…</span>
+      </div>
+
+      <div id="formatPreviewContent" class="format-preview-content">
+        <div class="format-preview-summary">
+          <div class="format-preview-badge" id="formatPreviewBadge">.litematic</div>
+          <div>
+            <strong id="formatPreviewStatus">等待生成</strong>
+            <p id="formatPreviewDescription" class="hint-text">选择一个目标格式后生成轻量摘要。</p>
+          </div>
+        </div>
+
+        <div class="format-preview-stats">
+          <div><span>尺寸</span><strong id="formatPreviewDimensions">-</strong></div>
+          <div><span>非空气方块</span><strong id="formatPreviewBlocks">-</strong></div>
+          <div><span>材料种类</span><strong id="formatPreviewMaterials">-</strong></div>
+          <div><span>导出文件名</span><strong id="formatPreviewOutput">-</strong></div>
+        </div>
+
+        <div class="format-preview-note" id="formatPreviewNote"></div>
+      </div>
+
+      <div class="modal-footer">
+        <span class="hint-text">轻量摘要不做编码；点击下载后才转写，不写入临时文件。</span>
+        <div>
+          <button id="downloadFormatPreviewBtn" class="btn btn-primary" disabled>📤 下载此格式</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dropzone Overlay -->
+  <div id="dropOverlay" class="drop-overlay hidden">
+    <div class="drop-box">松开鼠标导入（支持一次拖入多个文件批量入库！）<code>.html</code> / <code>.json</code> / <code>.litematic</code> / <code>.schem</code></div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script type="module" src="/src/web/app.js"></script>
+</body>
+</html>

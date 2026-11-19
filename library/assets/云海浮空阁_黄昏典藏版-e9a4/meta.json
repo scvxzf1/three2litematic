@@ -1,0 +1,34 @@
+{
+  "id": "云海浮空阁_黄昏典藏版-e9a4",
+  "name": "云海浮空阁_黄昏典藏版",
+  "sourceExt": "html",
+  "tags": [],
+  "favorite": false,
+  "dimensions": {
+    "width": 76,
+    "height": 72,
+    "length": 65
+  },
+  "blockCount": 18643,
+  "materialCount": 41,
+  "config": {
+    "versionPreset": "1.21",
+    "scaleMode": "auto",
+    "targetSize": 64,
+    "useSlabs": false,
+    "hollowInterior": false,
+    "excludeGravity": true,
+    "survivalFriendly": true,
+    "preferScene": false,
+    "brightness": 0,
+    "saturation": 100,
+    "ditherStrength": 0,
+    "disabledBlocks": [],
+    "disabledFamilies": [
+      "wool"
+    ],
+    "blockOverrides": {}
+  },
+  "createdAt": 1794985409464,
+  "updatedAt": 1794985409464
+}

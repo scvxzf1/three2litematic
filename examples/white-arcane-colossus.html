@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>White_Arcane_Colossus</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #080d1a; font-family: system-ui, sans-serif; }
+    #hud { position: fixed; left: 14px; bottom: 14px; z-index: 5; color: #f7fbff; background: rgba(8, 13, 26, .84); border: 1px solid rgba(196, 224, 255, .38); border-radius: 8px; padding: 8px 12px; font-size: 12px; pointer-events: none; }
+  </style>
+  <script type="importmap">
+  { "imports": { "three": "https://unpkg.com/three@0.187.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.187.0/examples/jsm/" } }
+  </script>
+</head>
+<body>
+  <div id="hud">正在构筑白色奥术巨构...</div>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    class VoxelWorld {
+      constructor(meta = {}) {
+        this.name = meta.name || 'Voxel_Build';
+        this.author = meta.author || 'AI_Architect';
+        this.description = meta.description || '';
+        this.cells = new Map();
+      }
+      set(x, y, z, material) {
+        if (!material) return;
+        const ix = Math.round(x), iy = Math.round(y), iz = Math.round(z);
+        const entry = typeof material === 'string' ? { color: material } : material;
+        this.cells.set(`${ix},${iy},${iz}`, { x: ix, y: iy, z: iz, ...entry });
+      }
+      del(x, y, z) { this.cells.delete(`${Math.round(x)},${Math.round(y)},${Math.round(z)}`); }
+      fillBox(x0, y0, z0, x1, y1, z1, material) {
+        for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++)
+          for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++)
+            for (let z = Math.min(z0, z1); z <= Math.max(z0, z1); z++) this.set(x, y, z, typeof material === 'function' ? material(x, y, z) : material);
+      }
+      cylinder(cx, y0, cz, radius, height, material, hollow = false) {
+        const r2 = radius * radius;
+        const inner = Math.max(0, (radius - 1.35) * (radius - 1.35));
+        for (let y = y0; y < y0 + height; y++) {
+          for (let x = -Math.ceil(radius); x <= Math.ceil(radius); x++) {
+            for (let z = -Math.ceil(radius); z <= Math.ceil(radius); z++) {
+              const d2 = x * x + z * z;
+              if (d2 <= r2 && (!hollow || d2 >= inner)) this.set(cx + x, y, cz + z, typeof material === 'function' ? material(cx + x, y, cz + z) : material);
+            }
+          }
+        }
+      }
+      line(x0, y0, z0, x1, y1, z1, material) {
+        const steps = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0, z1 - z0) * 2));
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          this.set(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, z0 + (z1 - z0) * t, material);
+        }
+      }
+      exportData() { return { name: this.name, author: this.author, description: this.description, voxels: Array.from(this.cells.values()) }; }
+      mountToScene(scene) {
+        const geometry = new THREE.BoxGeometry(1, 1, 1), groups = new Map(), matrix = new THREE.Matrix4();
+        let minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+        const opaque = (cell) => Boolean(cell && (cell.opacity ?? 1) >= 0.95);
+        for (const voxel of this.cells.values()) {
+          minX = Math.min(minX, voxel.x); maxX = Math.max(maxX, voxel.x); minY = Math.min(minY, voxel.y); maxY = Math.max(maxY, voxel.y); minZ = Math.min(minZ, voxel.z); maxZ = Math.max(maxZ, voxel.z);
+          if (opaque(voxel) && opaque(this.cells.get(`${voxel.x + 1},${voxel.y},${voxel.z}`)) && opaque(this.cells.get(`${voxel.x - 1},${voxel.y},${voxel.z}`)) && opaque(this.cells.get(`${voxel.x},${voxel.y + 1},${voxel.z}`)) && opaque(this.cells.get(`${voxel.x},${voxel.y - 1},${voxel.z}`)) && opaque(this.cells.get(`${voxel.x},${voxel.y},${voxel.z + 1}`)) && opaque(this.cells.get(`${voxel.x},${voxel.y},${voxel.z - 1}`))) continue;
+          const key = `${voxel.color}|${voxel.opacity ?? 1}|${voxel.emissive ?? ''}|${voxel.isLight ? 1 : 0}|${voxel.block ?? ''}`;
+          if (!groups.has(key)) groups.set(key, { proto: voxel, items: [] });
+          groups.get(key).items.push(voxel);
+        }
+        const root = new THREE.Group();
+        for (const { proto, items } of groups.values()) {
+          const glass = (proto.opacity ?? 1) < 0.85;
+          const glowing = Boolean(proto.isLight || proto.emissive);
+          const material = new THREE.MeshStandardMaterial({ color: new THREE.Color(proto.color || '#cccccc'), roughness: glass ? 0.12 : 0.78, metalness: proto.block?.includes('copper') || proto.block?.includes('gold') ? 0.42 : 0.05, transparent: glass, opacity: proto.opacity ?? 1, emissive: glowing ? new THREE.Color(proto.emissive || proto.color) : new THREE.Color(0), emissiveIntensity: glowing ? (proto.emissiveIntensity ?? 1) : 0 });
+          if (proto.block) material.userData.block = proto.block;
+          const mesh = new THREE.InstancedMesh(geometry, material, items.length);
+          mesh.castShadow = !glass; mesh.receiveShadow = true;
+          items.forEach((voxel, index) => { matrix.makeTranslation(voxel.x + 0.5, voxel.y + 0.5, voxel.z + 0.5); mesh.setMatrixAt(index, matrix); });
+          mesh.instanceMatrix.needsUpdate = true;
+          root.add(mesh);
+        }
+        scene.add(root);
+        return { center: new THREE.Vector3((minX + maxX + 1) * 0.5, (minY + maxY + 1) * 0.46, (minZ + maxZ + 1) * 0.5), size: new THREE.Vector3(maxX - minX + 1, maxY - minY + 1, maxZ - minZ + 1) };
+      }
+    }
+
+    const world = new VoxelWorld({
+      name: 'White_Arcane_Colossus',
+      author: 'AI_Architect',
+      description: 'A newly authored five-stage white arcane megastructure with a sunken astrolabe altar, flying buttresses, rune rings, and a visible spiral energy core.',
+    });
+
+    const MAT = {
+      quartz: { color: '#f3f5f2', block: 'minecraft:quartz_block' },
+      smooth: { color: '#e8ece8', block: 'minecraft:smooth_quartz' },
+      calcite: { color: '#e2e4dc', block: 'minecraft:calcite' },
+      diorite: { color: '#c9ccca', block: 'minecraft:polished_diorite' },
+      shadow: { color: '#929a9c', block: 'minecraft:polished_andesite' },
+      bronze: { color: '#a8874b', block: 'minecraft:cut_copper' },
+      gold: { color: '#e0ae32', block: 'minecraft:gold_block' },
+      violet: { color: '#b967dc', opacity: 0.58, block: 'minecraft:purple_stained_glass' },
+      paleViolet: { color: '#e8caff', opacity: 0.54, block: 'minecraft:amethyst_block' },
+      water: { color: '#76d7df', opacity: 0.52, block: 'minecraft:light_blue_stained_glass' },
+      sea: { color: '#b8fff3', emissive: '#63fff0', emissiveIntensity: 1.15, isLight: true, block: 'minecraft:sea_lantern' },
+      arcane: { color: '#eed7ff', emissive: '#c56bff', emissiveIntensity: 1.4, isLight: true, block: 'minecraft:pearlescent_froglight' },
+      sun: { color: '#fff0ae', emissive: '#ffcf56', emissiveIntensity: 1.2, isLight: true, block: 'minecraft:ochre_froglight' },
+    };
+
+    function hash(x, y, z) {
+      let value = (x * 92837111 + y * 689287499 + z * 283923481) | 0;
+      value = Math.imul(value ^ (value >>> 15), 2246822519);
+      return ((value ^ (value >>> 13)) >>> 0) / 4294967295;
+    }
+
+    function ring(cx, cy, cz, radius, u, v, material, segments = 128) {
+      for (let i = 0; i < segments; i++) {
+        const angle = (Math.PI * 2 * i) / segments;
+        world.set(cx + Math.cos(angle) * radius * u.x + Math.sin(angle) * radius * v.x, cy + Math.cos(angle) * radius * u.y + Math.sin(angle) * radius * v.y, cz + Math.cos(angle) * radius * u.z + Math.sin(angle) * radius * v.z, material);
+      }
+    }
+
+    function discRing(cx, y, cz, innerRadius, outerRadius, material) {
+      for (let radius = innerRadius; radius <= outerRadius; radius++) ring(cx, y, cz, radius, { x: 1, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }, material, Math.max(32, Math.ceil(radius * 7)));
+    }
+
+    function radialSpoke(cx, y, cz, angle, length, material, width = 1) {
+      const endX = cx + Math.cos(angle) * length;
+      const endZ = cz + Math.sin(angle) * length;
+      for (let offset = -width; offset <= width; offset++) world.line(cx, y, cz, endX - Math.sin(angle) * offset, y, endZ + Math.cos(angle) * offset, material);
+    }
+
+    function pillar(cx, y0, cz, width, height, material) {
+      const half = Math.floor(width / 2);
+      world.fillBox(cx - half, y0, cz - half, cx + half, y0 + height - 1, cz + half, material);
+    }
+
+    function curvedButtress(cx, cz, lowerRadius, upperRadius, y0, y1, angle, material) {
+      const steps = Math.max(5, Math.ceil((y1 - y0) / 2));
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const radius = lowerRadius + (upperRadius - lowerRadius) * t + Math.sin(t * Math.PI) * 3;
+        const x = Math.round(cx + Math.cos(angle) * radius);
+        const z = Math.round(cz + Math.sin(angle) * radius);
+        for (let ox = -1; ox <= 1; ox++) for (let oz = -1; oz <= 1; oz++) world.set(x + ox, Math.round(y0 + (y1 - y0) * t), z + oz, material);
+      }
+    }
+
+    const cx = 52, cz = 52;
+
+    world.cylinder(cx, 0, cz, 49, 2, (x, y, z) => hash(x, y, z) < 0.12 ? MAT.shadow : MAT.diorite);
+    world.cylinder(cx, 2, cz, 46, 2, MAT.smooth);
+    discRing(cx, 4, cz, 39, 47, MAT.quartz);
+    discRing(cx, 5, cz, 32, 37, MAT.calcite);
+    ring(cx, 6, cz, 45, { x: 1, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }, MAT.bronze, 256);
+    ring(cx, 6, cz, 43, { x: 1, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }, MAT.water, 240);
+    ring(cx, 6, cz, 35, { x: 1, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }, MAT.bronze, 200);
+    ring(cx, 6, cz, 33, { x: 1, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }, MAT.water, 192);
+    for (let i = 0; i < 8; i++) radialSpoke(cx, 7, cz, i * Math.PI / 4, 39, i % 2 ? MAT.gold : MAT.bronze, 1);
+    ring(cx, 7, cz, 22, { x: 1, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }, MAT.gold, 160);
+    for (let i = 0; i < 16; i++) {
+      const a = i * Math.PI / 8;
+      const x = Math.round(cx + Math.cos(a) * 39), z = Math.round(cz + Math.sin(a) * 39);
+      pillar(x, 7, z, 2, 4, MAT.calcite);
+      world.set(x, 11, z, i % 2 ? MAT.sea : MAT.sun);
+    }
+    for (let i = 0; i < 8; i++) {
+      const a = i * Math.PI / 4 + Math.PI / 8;
+      const x = Math.round(cx + Math.cos(a) * 27), z = Math.round(cz + Math.sin(a) * 27);
+      world.fillBox(x - 1, 7, z - 1, x + 1, 15, z + 1, MAT.shadow);
+      world.set(x, 16, z, MAT.gold);
+      world.set(x, 17, z, MAT.sea);
+    }
+
+    const tiers = [
+      { start: 8, end: 31, radius: 30 },
+      { start: 29, end: 52, radius: 26 },
+      { start: 50, end: 73, radius: 22 },
+      { start: 71, end: 94, radius: 18 },
+      { start: 92, end: 114, radius: 14 },
+    ];
+
+    for (let tierIndex = 0; tierIndex < tiers.length; tierIndex++) {
+      const tier = tiers[tierIndex];
+      const height = tier.end - tier.start + 1;
+      world.cylinder(cx, tier.start, cz, tier.radius, height, (x, y, z) => hash(x, y, z) < 0.10 && y < 40 ? MAT.calcite : (y % 5 === 0 ? MAT.smooth : MAT.quartz), true);
+      discRing(cx, tier.start - 1, cz, tier.radius - 2, tier.radius + 3, tierIndex % 2 ? MAT.calcite : MAT.smooth);
+      discRing(cx, tier.end, cz, tier.radius - 1, tier.radius + 2, MAT.bronze);
+      ring(cx, tier.end + 1, cz, tier.radius + 1, { x: 1, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }, MAT.quartz, Math.max(72, tier.radius * 7));
+      for (let i = 0; i < 24; i++) {
+        const angle = i * Math.PI / 12;
+        const px = Math.round(cx + Math.cos(angle) * (tier.radius + 1));
+        const pz = Math.round(cz + Math.sin(angle) * (tier.radius + 1));
+        pillar(px, tier.start + 1, pz, i % 3 === 0 ? 3 : 2, height - 2, i % 4 === 0 ? MAT.calcite : MAT.quartz);
+        if (i % 3 === 0) world.set(px, tier.start + Math.floor(height * 0.5), pz, MAT.sea);
+      }
+      for (const angle of [0, Math.PI / 2, Math.PI, Math.PI * 1.5]) {
+        for (let y = tier.start + 4; y < tier.end - 2; y += 6) {
+          const px = Math.round(cx + Math.cos(angle) * tier.radius);
+          const pz = Math.round(cz + Math.sin(angle) * tier.radius);
+          for (let d = -1; d <= 1; d++) {
+            if (Math.abs(Math.cos(angle)) > 0.5) world.set(px, y + d, pz + d, MAT.paleViolet);
+            else world.set(px + d, y + d, pz, MAT.paleViolet);
+          }
+        }
+      }
+      if (tierIndex >= 2) {
+        for (let i = 0; i < 8; i++) {
+          const angle = i * Math.PI / 4;
+          const px = Math.round(cx + Math.cos(angle) * tier.radius);
+          const pz = Math.round(cz + Math.sin(angle) * tier.radius);
+          for (let y = tier.start + 4; y < tier.end - 2; y++) {
+            for (let d = -1; d <= 1; d++) {
+              if (Math.abs(Math.cos(angle)) > 0.5) world.del(px, y, pz + d);
+              else world.del(px + d, y, pz);
+            }
+          }
+          for (let y = tier.start + 5; y < tier.end - 2; y += 4) {
+            const wx = Math.round(cx + Math.cos(angle) * (tier.radius + 1));
+            const wz = Math.round(cz + Math.sin(angle) * (tier.radius + 1));
+            world.set(wx, y, wz, MAT.violet);
+            world.set(wx, y + 1, wz, MAT.violet);
+          }
+        }
+      }
+      for (let i = 0; i < 8; i++) curvedButtress(cx, cz, tier.radius + 3, Math.max(8, tier.radius - 1), tier.start + 1, tier.end - 1, i * Math.PI / 4 + Math.PI / 8, i % 2 ? MAT.calcite : MAT.smooth);
+      for (let i = 0; i < 8; i++) curvedButtress(cx, cz, tier.radius + 5, Math.max(10, tier.radius + 1), tier.start + 2, tier.end - 3, i * Math.PI / 4 + Math.PI / 8, MAT.shadow);
+    }
+
+    for (let y = 22; y <= 119; y++) {
+      world.cylinder(cx, y, cz, 3, 1, y % 5 === 0 ? MAT.paleViolet : MAT.violet);
+      const phase = (y - 22) * Math.PI / 7;
+      for (let arm = 0; arm < 4; arm++) {
+        const angle = phase + arm * Math.PI / 2;
+        const x = Math.round(cx + Math.cos(angle) * 5);
+        const z = Math.round(cz + Math.sin(angle) * 5);
+        world.set(x, y, z, y % 9 === 0 ? MAT.sun : MAT.arcane);
+      }
+    }
+    for (let y = 27; y <= 115; y++) {
+      const angle = (y - 27) * Math.PI / 9;
+      const x = cx + Math.cos(angle) * 6;
+      const z = cz + Math.sin(angle) * 6;
+      world.line(x - 1, y, z - 1, x + 1, y, z + 1, y % 11 === 0 ? MAT.sun : MAT.arcane);
+    }
+    world.cylinder(cx, 119, cz, 7, 2, MAT.bronze);
+    world.sphere = (x, y, z, radius, material) => {
+      for (let dx = -radius; dx <= radius; dx++) for (let dy = -radius; dy <= radius; dy++) for (let dz = -radius; dz <= radius; dz++) if (dx * dx + dy * dy + dz * dz <= radius * radius) world.set(x + dx, y + dy, z + dz, material);
+    };
+    world.sphere(cx, 122, cz, 4, MAT.arcane);
+    world.set(cx, 126, cz, MAT.sun);
+
+    ring(cx, 64, cz, 39, { x: 1, y: 0.22, z: 0 }, { x: 0, y: 0.88, z: 0.45 }, MAT.quartz, 192);
+    ring(cx, 64, cz, 37, { x: 1, y: 0.22, z: 0 }, { x: 0, y: 0.88, z: 0.45 }, MAT.bronze, 192);
+    ring(cx, 76, cz, 34, { x: 0.95, y: -0.28, z: 0.2 }, { x: -0.12, y: 0.37, z: 0.92 }, MAT.calcite, 176);
+    ring(cx, 76, cz, 32, { x: 0.95, y: -0.28, z: 0.2 }, { x: -0.12, y: 0.37, z: 0.92 }, MAT.gold, 176);
+    ring(cx, 86, cz, 30, { x: 0.82, y: 0.45, z: 0.34 }, { x: -0.32, y: 0.21, z: 0.92 }, MAT.smooth, 160);
+    ring(cx, 86, cz, 28, { x: 0.82, y: 0.45, z: 0.34 }, { x: -0.32, y: 0.21, z: 0.92 }, MAT.bronze, 160);
+    for (const [radius, y, phase] of [[39, 64, 0], [34, 76, 1], [30, 86, 2]]) {
+      for (let i = 0; i < 24; i++) {
+        const a = i * Math.PI / 12 + phase;
+        const x = Math.round(cx + Math.cos(a) * radius);
+        const z = Math.round(cz + Math.sin(a) * radius);
+        world.set(x, Math.round(y + Math.sin(a) * 8), z, i % 2 ? MAT.arcane : MAT.sun);
+      }
+    }
+
+    for (let i = 0; i < 16; i++) {
+      const angle = i * Math.PI / 8;
+      const x = Math.round(cx + Math.cos(angle) * 20), z = Math.round(cz + Math.sin(angle) * 20);
+      world.fillBox(x - 1, 8, z - 1, x + 1, 20 + (i % 2) * 4, z + 1, MAT.quartz);
+      world.set(x, 21 + (i % 2) * 4, z, MAT.gold);
+      world.set(x, 22 + (i % 2) * 4, z, MAT.sea);
+    }
+
+    window.__VOXEL_DATA__ = world.exportData();
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color('#080d1a');
+    const { center, size } = world.mountToScene(scene);
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 2000);
+    camera.position.set(center.x + maxDim * 1.02, center.y + maxDim * 0.72, center.z + maxDim * 1.02);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    renderer.shadowMap.enabled = world.cells.size <= 16000;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    document.body.appendChild(renderer.domElement);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.copy(center); controls.enableDamping = true;
+    scene.add(new THREE.HemisphereLight(0xe8f2ff, 0x1a2140, 0.9));
+    const sun = new THREE.DirectionalLight(0xfff7e8, 1.5);
+    sun.position.set(center.x + maxDim, center.y + maxDim * 1.3, center.z + maxDim * 0.7);
+    sun.castShadow = renderer.shadowMap.enabled;
+    scene.add(sun);
+    document.getElementById('hud').textContent = `${world.name} · ${size.x}×${size.y}×${size.z} · ${world.cells.size} 方块`;
+    window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+    renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+  </script>
+</body>
+</html>

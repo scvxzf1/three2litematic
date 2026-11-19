@@ -1,0 +1,23 @@
+{
+  "name": "three2litematic — Three.js 转 Minecraft 蓝图工作台",
+  "short_name": "three2litematic",
+  "description": "将 Three.js 像素/体素场景转换为 Minecraft Litematica (.litematic) 与 WorldEdit (.schem) 蓝图",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0c0f15",
+  "theme_color": "#141821",
+  "icons": [
+    {
+      "src": "/src/web/assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/src/web/assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

@@ -1,0 +1,82 @@
+[
+  {
+    "id": "preset-fireproof-survival",
+    "name": "🔥 生存防火·禁羊毛木质",
+    "builtIn": true,
+    "config": {
+      "useSlabs": false,
+      "hollowInterior": false,
+      "excludeGravity": true,
+      "survivalFriendly": true,
+      "brightness": 0,
+      "saturation": 100,
+      "ditherStrength": 0,
+      "disabledFamilies": [
+        "wool",
+        "wood"
+      ],
+      "disabledBlocks": [],
+      "blockOverrides": {}
+    }
+  },
+  {
+    "id": "preset-gothic-deepslate",
+    "name": "🏰 暗黑哥特·深板岩混色",
+    "builtIn": true,
+    "config": {
+      "useSlabs": true,
+      "hollowInterior": false,
+      "excludeGravity": true,
+      "survivalFriendly": true,
+      "brightness": -14,
+      "saturation": 72,
+      "ditherStrength": 35,
+      "disabledFamilies": [
+        "wool"
+      ],
+      "disabledBlocks": [],
+      "blockOverrides": {}
+    }
+  },
+  {
+    "id": "preset-pastel-terracotta",
+    "name": "🌸 柔和暖调·陶瓦方解石",
+    "builtIn": true,
+    "config": {
+      "useSlabs": true,
+      "hollowInterior": false,
+      "excludeGravity": true,
+      "survivalFriendly": true,
+      "brightness": 8,
+      "saturation": 85,
+      "ditherStrength": 15,
+      "disabledFamilies": [
+        "wool"
+      ],
+      "disabledBlocks": [],
+      "blockOverrides": {
+        "minecraft:stone_bricks": "minecraft:calcite"
+      }
+    }
+  },
+  {
+    "id": "preset-luminous-priority",
+    "name": "✨ 奥术高亮·光源优先",
+    "builtIn": true,
+    "config": {
+      "useSlabs": true,
+      "hollowInterior": false,
+      "excludeGravity": true,
+      "survivalFriendly": true,
+      "brightness": 4,
+      "saturation": 108,
+      "ditherStrength": 0,
+      "preferLightBlocks": true,
+      "disabledFamilies": [
+        "wool"
+      ],
+      "disabledBlocks": [],
+      "blockOverrides": {}
+    }
+  }
+]

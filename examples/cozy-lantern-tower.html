@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cozy_Blossom_Lantern_Tower</title>
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/src/web/assets/icon-32.png" />
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #0c1220; font-family: system-ui, sans-serif; }
+    #hud {
+      position: fixed; left: 12px; bottom: 12px; z-index: 10;
+      background: rgba(12, 18, 32, 0.8); backdrop-filter: blur(6px);
+      border: 1px solid rgba(255,255,255,0.14); border-radius: 8px;
+      color: #e2e8f0; padding: 7px 12px; font-size: 12px; pointer-events: none;
+    }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.187.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.187.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="hud">正在构建樱花灯塔小筑...</div>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    function hash3(x, y, z) {
+      let h = (x * 374761393 + y * 668265263 + z * 2147483647) | 0;
+      h = ((h ^ (h >> 13)) * 1274126177) | 0;
+      return ((h ^ (h >> 16)) >>> 0) / 4294967295;
+    }
+
+    class VoxelWorld {
+      constructor(meta = {}) {
+        this.name = meta.name || 'Voxel_Build';
+        this.author = meta.author || 'three-voxel-schematic';
+        this.description = meta.description || '';
+        this.cells = new Map();
+      }
+      _resolve(m, x, y, z) { return typeof m === 'function' ? m(x, y, z) : m; }
+      set(x, y, z, mat) {
+        if (!mat) return;
+        const ix = Math.round(x), iy = Math.round(y), iz = Math.round(z);
+        const entry = typeof mat === 'string' ? { color: mat } : mat;
+        this.cells.set(`${ix},${iy},${iz}`, { x: ix, y: iy, z: iz, ...entry });
+      }
+      del(x, y, z) { this.cells.delete(`${Math.round(x)},${Math.round(y)},${Math.round(z)}`); }
+      fillBox(x0, y0, z0, x1, y1, z1, m) {
+        for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++)
+          for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++)
+            for (let z = Math.min(z0, z1); z <= Math.max(z0, z1); z++)
+              this.set(x, y, z, this._resolve(m, x, y, z));
+      }
+      hollowBox(x0, y0, z0, x1, y1, z1, m) {
+        const ax = Math.min(x0, x1), bx = Math.max(x0, x1);
+        const ay = Math.min(y0, y1), by = Math.max(y0, y1);
+        const az = Math.min(z0, z1), bz = Math.max(z0, z1);
+        for (let x = ax; x <= bx; x++)
+          for (let y = ay; y <= by; y++)
+            for (let z = az; z <= bz; z++)
+              if (x === ax || x === bx || y === ay || y === by || z === az || z === bz)
+                this.set(x, y, z, this._resolve(m, x, y, z));
+      }
+      cylinder(cx, y0, cz, r, h, m, hollow = false) {
+        const r2 = r * r, ir2 = Math.max(0, (r - 1.1) * (r - 1.1)), R = Math.ceil(r);
+        for (let dy = 0; dy < h; dy++)
+          for (let dx = -R; dx <= R; dx++)
+            for (let dz = -R; dz <= R; dz++) {
+              const d2 = dx * dx + dz * dz;
+              if (d2 <= r2 && (!hollow || d2 >= ir2))
+                this.set(cx + dx, y0 + dy, cz + dz, this._resolve(m, cx + dx, y0 + dy, cz + dz));
+            }
+      }
+      sphere(cx, cy, cz, r, m) {
+        const r2 = r * r, R = Math.ceil(r);
+        for (let dx = -R; dx <= R; dx++)
+          for (let dy = -R; dy <= R; dy++)
+            for (let dz = -R; dz <= R; dz++)
+              if (dx * dx + dy * dy + dz * dz <= r2)
+                this.set(cx + dx, cy + dy, cz + dz, this._resolve(m, cx + dx, cy + dy, cz + dz));
+      }
+      exportData() {
+        return { name: this.name, author: this.author, description: this.description, voxels: Array.from(this.cells.values()) };
+      }
+      mountToScene(scene) {
+        const unitGeo = new THREE.BoxGeometry(1, 1, 1);
+        const groups = new Map();
+        let minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+        for (const v of this.cells.values()) {
+          if (v.x < minX) minX = v.x; if (v.x > maxX) maxX = v.x;
+          if (v.y < minY) minY = v.y; if (v.y > maxY) maxY = v.y;
+          if (v.z < minZ) minZ = v.z; if (v.z > maxZ) maxZ = v.z;
+          const k = `${v.color}|${v.opacity ?? 1}|${v.emissive ?? ''}|${v.isLight ? 1 : 0}|${v.block ?? ''}`;
+          if (!groups.has(k)) groups.set(k, { proto: v, items: [] });
+          groups.get(k).items.push(v);
+        }
+        const root = new THREE.Group();
+        const mat4 = new THREE.Matrix4();
+        for (const { proto, items } of groups.values()) {
+          const isGlass = (proto.opacity ?? 1) < 0.85;
+          const isLight = Boolean(proto.isLight || proto.emissive);
+          const material = new THREE.MeshStandardMaterial({
+            color: new THREE.Color(proto.color || '#ccc'),
+            roughness: isGlass ? 0.15 : 0.82,
+            metalness: 0.05,
+            transparent: isGlass,
+            opacity: proto.opacity ?? 1,
+            emissive: isLight ? new THREE.Color(proto.emissive || proto.color) : new THREE.Color(0x000000),
+            emissiveIntensity: isLight ? (proto.emissiveIntensity ?? 0.95) : 0,
+          });
+          if (proto.block) material.userData.block = proto.block;
+          const inst = new THREE.InstancedMesh(unitGeo, material, items.length);
+          inst.castShadow = !isGlass;
+          inst.receiveShadow = true;
+          items.forEach((v, i) => { mat4.makeTranslation(v.x + 0.5, v.y + 0.5, v.z + 0.5); inst.setMatrixAt(i, mat4); });
+          inst.instanceMatrix.needsUpdate = true;
+          root.add(inst);
+        }
+        scene.add(root);
+        return {
+          center: new THREE.Vector3((minX + maxX + 1) * 0.5, (minY + maxY + 1) * 0.42, (minZ + maxZ + 1) * 0.5),
+          size: new THREE.Vector3(maxX - minX + 1, maxY - minY + 1, maxZ - minZ + 1),
+        };
+      }
+    }
+
+    // ==================== Build Cozy Blossom Lantern Watchtower ====================
+    const world = new VoxelWorld({
+      name: 'Cozy_Blossom_Lantern_Tower',
+      description: 'Medieval spruce & calcite watchtower beside a cherry blossom pond',
+    });
+
+    const MAT = {
+      grass:       { color: '#596d2d', block: 'minecraft:moss_block' },
+      grassAlt:    { color: '#546d1b', block: 'minecraft:green_wool' },
+      dirt:        { color: '#603b1f', block: 'minecraft:brown_concrete' },
+      stoneBrick:  { color: '#7a797a', block: 'minecraft:stone_bricks' },
+      mossyBrick:  { color: '#737969', block: 'minecraft:mossy_stone_bricks' },
+      deepslate:   { color: '#363637', block: 'minecraft:deepslate_tiles' },
+      pathStone:   { color: '#8e6a4f', block: 'minecraft:packed_mud' },
+      spruceLog:   { color: '#3a2510', block: 'minecraft:spruce_wood' },
+      sprucePlank: { color: '#725430', block: 'minecraft:spruce_planks' },
+      plaster:     { color: '#dfe0dc', block: 'minecraft:calcite' },
+      plasterWarm: { color: '#d1b2a1', block: 'minecraft:white_terracotta' },
+      roofTeal:    { color: '#335b4b', block: 'minecraft:dark_prismarine' },
+      roofLight:   { color: '#52a284', block: 'minecraft:oxidized_copper' },
+      windowWarm:  { color: '#e5e533', opacity: 0.50, block: 'minecraft:yellow_stained_glass' },
+      waterGlass:  { color: '#6699d8', opacity: 0.52, block: 'minecraft:light_blue_stained_glass' },
+      smokeGlass:  { color: '#ffffff', opacity: 0.35, block: 'minecraft:white_stained_glass' },
+      frogLight:   { color: '#faf5ce', emissive: '#ffd275', emissiveIntensity: 1.0, isLight: true, block: 'minecraft:ochre_froglight' },
+      shroomLight: { color: '#f09246', emissive: '#ff8533', emissiveIntensity: 1.0, isLight: true, block: 'minecraft:shroomlight' },
+      cherryLeaf:  { color: '#e5b1c7', block: 'minecraft:cherry_leaves' },
+      cherryPink:  { color: '#ed8dac', block: 'minecraft:pink_wool' },
+      oakLeaves:   { color: '#487626', block: 'minecraft:oak_leaves' },
+    };
+
+    // 1. Rounded island terrace base (28 x 3 x 28)
+    world.cylinder(14, 0, 14, 13.4, 1, MAT.deepslate);
+    world.cylinder(14, 1, 14, 13.0, 2, (x, y, z) =>
+      hash3(x, y, z) < 0.28 ? MAT.grassAlt : MAT.grass
+    );
+
+    // 2. Tranquil garden pond on the front-right (translucent stained glass water)
+    for (let x = 16; x <= 24; x++) {
+      for (let z = 15; z <= 23; z++) {
+        const dist = Math.hypot(x - 20, z - 19);
+        if (dist <= 4.2) {
+          world.set(x, 1, z, MAT.stoneBrick);
+          world.set(x, 2, z, MAT.waterGlass);
+        }
+      }
+    }
+    // Stepping path from front edge to tower door
+    for (let z = 17; z <= 25; z++) {
+      world.fillBox(10, 2, z, 12, 2, z, (x, y, zz) => (hash3(x, y, zz) < 0.4 ? MAT.stoneBrick : MAT.pathStone));
+    }
+
+    // 3. Lower hollow stone watchtower (x: 7..15, z: 7..15, y: 3..11)
+    world.hollowBox(7, 3, 7, 15, 11, 15, (x, y, z) => {
+      if ((x === 7 || x === 15) && (z === 7 || z === 15)) return MAT.deepslate;
+      return hash3(x, y, z) < (y < 6 ? 0.35 : 0.15) ? MAT.mossyBrick : MAT.stoneBrick;
+    });
+    // Entrance arch at z=15, x=10..12
+    world.fillBox(10, 3, 15, 12, 6, 15, null);
+    for (let x = 10; x <= 12; x++) for (let y = 3; y <= 5; y++) world.del(x, y, 15);
+    world.set(11, 6, 15, MAT.shroomLight);
+
+    // Narrow medieval slit windows with warm stained glass
+    for (const y of [7, 8, 9]) {
+      world.set(11, y, 7, MAT.windowWarm);
+      world.set(7, y, 11, MAT.windowWarm);
+      world.set(15, y, 11, MAT.windowWarm);
+    }
+
+    // 4. Overhanging timber-frame upper chamber (x: 6..16, z: 6..16, y: 12..18)
+    world.fillBox(5, 12, 5, 17, 12, 17, MAT.sprucePlank); // Floor deck overhang
+    world.hollowBox(6, 13, 6, 16, 18, 16, (x, y, z) =>
+      hash3(x, y, z) < 0.25 ? MAT.plasterWarm : MAT.plaster
+    );
+
+    // Proud spruce corner pillars & crossbeams (1 block relief!)
+    for (const px of [6, 16]) {
+      for (const pz of [6, 16]) {
+        world.fillBox(px, 12, pz, px, 19, pz, MAT.spruceLog);
+      }
+    }
+    for (let i = 6; i <= 16; i++) {
+      world.set(i, 18, 6, MAT.spruceLog);
+      world.set(i, 18, 16, MAT.spruceLog);
+      world.set(6, 18, i, MAT.spruceLog);
+      world.set(16, 18, i, MAT.spruceLog);
+    }
+
+    // Glowing cottage windows on all 4 sides + flowerboxes
+    for (const [wx, wz, nx, nz] of [[11, 6, 0, -1], [11, 16, 0, 1], [6, 11, -1, 0], [16, 11, 1, 0]]) {
+      for (let d = -1; d <= 1; d++) {
+        const x = nx === 0 ? wx + d : wx;
+        const z = nz === 0 ? wz + d : wz;
+        world.set(x, 15, z, MAT.windowWarm);
+        world.set(x, 16, z, MAT.windowWarm);
+        world.set(x + nx, 14, z + nz, MAT.sprucePlank);
+      }
+      // Interior warm light behind window so window glows warmly
+      world.set(wx - nx, 15, wz - nz, MAT.frogLight);
+    }
+
+    // 5. Stepped Witch/Pagoda Cone Spire Roof (y: 19..31)
+    const roofRadii = [7.4, 6.4, 5.5, 4.7, 3.9, 3.2, 2.6, 2.1, 1.6, 1.2, 0.9, 0.6, 0.4];
+    roofRadii.forEach((rad, idx) => {
+      const y = 19 + idx;
+      world.cylinder(11, y, 11, rad, 1, (x, yy, z) =>
+        hash3(x, yy, z) < 0.3 ? MAT.roofLight : MAT.roofTeal,
+        rad > 2.2
+      );
+    });
+    world.set(11, 32, 11, MAT.frogLight); // Beacon finial at spire peak!
+
+    // 6. Brick Chimney +Translucent Smoke Wisps
+    world.fillBox(15, 14, 8, 16, 23, 9, MAT.stoneBrick);
+    world.set(15, 24, 8, MAT.smokeGlass);
+    world.set(16, 25, 8, MAT.smokeGlass);
+    world.set(16, 26, 7, MAT.smokeGlass);
+
+    // 7. Hanging Corner Lanterns
+    for (const [lx, lz] of [[5, 5], [17, 5], [5, 17], [17, 17]]) {
+      world.set(lx, 11, lz, MAT.sprucePlank);
+      world.set(lx, 10, lz, MAT.shroomLight);
+    }
+
+    // 8. Blooming Cherry Tree beside the pond (x=21, z=9)
+    world.fillBox(21, 3, 9, 21, 8, 9, MAT.spruceLog);
+    world.set(20, 8, 9, MAT.spruceLog);
+    world.set(22, 9, 10, MAT.spruceLog);
+    const canopyCenters = [
+      [21, 10, 9, 3.3],
+      [19, 9, 8, 2.5],
+      [23, 9, 10, 2.6],
+      [21, 11, 11, 2.2],
+    ];
+    for (const [cx, cy, cz, cr] of canopyCenters) {
+      world.sphere(cx, cy, cz, cr, (x, y, z) => {
+        const h = hash3(x, y, z);
+        if (h < 0.12) return null; // Airy canopy gaps
+        return h < 0.35 ? MAT.cherryPink : MAT.cherryLeaf;
+      });
+    }
+    // Lantern hanging from cherry branch
+    world.set(19, 6, 8, MAT.frogLight);
+
+    // Garden bushes
+    world.sphere(6, 3, 18, 1.7, MAT.oakLeaves);
+    world.sphere(15, 3, 22, 1.4, MAT.oakLeaves);
+
+    // Register lossless voxel export data
+    window.__VOXEL_DATA__ = world.exportData();
+
+    // ==================== Render Scene ====================
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color('#0c1220');
+
+    const { center, size } = world.mountToScene(scene);
+    const maxDim = Math.max(size.x, size.y, size.z);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(center.x + maxDim * 1.15, center.y + maxDim * 0.72, center.z + maxDim * 1.25);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.12;
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.copy(center);
+    controls.enableDamping = true;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.6;
+
+    scene.add(new THREE.HemisphereLight(0xdbeafe, 0x1e293b, 0.8));
+    const sun = new THREE.DirectionalLight(0xfff4e6, 1.4);
+    sun.position.set(48, 65, 42);
+    sun.castShadow = true;
+    scene.add(sun);
+
+    const warmGlow = new THREE.PointLight(0xffaa44, 18, 26);
+    warmGlow.position.set(11, 14, 18);
+    scene.add(warmGlow);
+
+    document.getElementById('hud').textContent =
+      `樱花灯塔小筑 · ${size.x}×${size.y}×${size.z} · ${world.cells.size} 体素 (Skill 标准 1:1 场景)`;
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    renderer.setAnimationLoop(() => {
+      controls.update();
+      renderer.render(scene, camera);
+    });
+  </script>
+</body>
+</html>

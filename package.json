@@ -1,0 +1,23 @@
+{
+  "name": "three2litematic",
+  "version": "1.0.0",
+  "description": "Convert AI-generated Three.js voxel/pixel scenes into Minecraft Litematica (.litematic) schematics with Web preview & CLI",
+  "type": "module",
+  "main": "./src/core/index.js",
+  "bin": {
+    "three2litematic": "./src/cli/index.js"
+  },
+  "scripts": {
+    "start": "node ./src/cli/index.js serve",
+    "serve": "node ./src/cli/index.js serve",
+    "convert": "node ./src/cli/index.js convert",
+    "place": "node ./src/cli/index.js place",
+    "worlds": "node ./src/cli/index.js worlds",
+    "rollback": "node ./src/cli/index.js rollback",
+    "inspect": "node ./src/cli/index.js inspect",
+    "test": "node ./test/run-tests.js"
+  },
+  "dependencies": {
+    "three": "^0.187.0"
+  }
+}

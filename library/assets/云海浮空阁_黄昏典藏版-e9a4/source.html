@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cloudsea_Pagoda_Sanctuary</title>
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/src/web/assets/icon-32.png" />
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #0a101d; font-family: system-ui, sans-serif; }
+    #hud {
+      position: fixed; left: 12px; bottom: 12px; z-index: 10;
+      background: rgba(10, 16, 29, 0.82); backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.14); border-radius: 8px;
+      color: #e2e8f0; padding: 7px 12px; font-size: 12px; pointer-events: none;
+    }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.187.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.187.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="hud">正在构筑《云海樱泉·五重飞檐浮空阁》...</div>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // Deterministic coordinate hash (zero Math.random drift between CLI and Web!)
+    function hash3(x, y, z) {
+      let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(z, 2147483647)) | 0;
+      h = Math.imul(h ^ (h >>> 13), 1274126177);
+      return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
+    }
+
+    function noise2(x, z) {
+      return (
+        Math.sin(x * 0.19 + z * 0.13) * 0.45 +
+        Math.cos(x * 0.37 - z * 0.29) * 0.32 +
+        Math.sin((x + z) * 0.61) * 0.23
+      );
+    }
+
+    class VoxelWorld {
+      constructor(meta = {}) {
+        this.name = meta.name || 'Cloudsea_Pagoda_Sanctuary';
+        this.author = meta.author || 'three-voxel-schematic';
+        this.description = meta.description || '';
+        this.cells = new Map();
+      }
+
+      _resolve(m, x, y, z) {
+        return typeof m === 'function' ? m(x, y, z) : m;
+      }
+
+      set(x, y, z, mat) {
+        if (!mat) return;
+        const ix = Math.round(x), iy = Math.round(y), iz = Math.round(z);
+        const entry = typeof mat === 'string' ? { color: mat } : mat;
+        this.cells.set(`${ix},${iy},${iz}`, { x: ix, y: iy, z: iz, ...entry });
+      }
+
+      del(x, y, z) {
+        this.cells.delete(`${Math.round(x)},${Math.round(y)},${Math.round(z)}`);
+      }
+
+      has(x, y, z) {
+        return this.cells.has(`${Math.round(x)},${Math.round(y)},${Math.round(z)}`);
+      }
+
+      fillBox(x0, y0, z0, x1, y1, z1, m) {
+        const ax = Math.min(x0, x1), bx = Math.max(x0, x1);
+        const ay = Math.min(y0, y1), by = Math.max(y0, y1);
+        const az = Math.min(z0, z1), bz = Math.max(z0, z1);
+        for (let x = ax; x <= bx; x++)
+          for (let y = ay; y <= by; y++)
+            for (let z = az; z <= bz; z++)
+              this.set(x, y, z, this._resolve(m, x, y, z));
+      }
+
+      clearBox(x0, y0, z0, x1, y1, z1) {
+        const ax = Math.min(x0, x1), bx = Math.max(x0, x1);
+        const ay = Math.min(y0, y1), by = Math.max(y0, y1);
+        const az = Math.min(z0, z1), bz = Math.max(z0, z1);
+        for (let x = ax; x <= bx; x++)
+          for (let y = ay; y <= by; y++)
+            for (let z = az; z <= bz; z++)
+              this.del(x, y, z);
+      }
+
+      hollowBox(x0, y0, z0, x1, y1, z1, m) {
+        const ax = Math.min(x0, x1), bx = Math.max(x0, x1);
+        const ay = Math.min(y0, y1), by = Math.max(y0, y1);
+        const az = Math.min(z0, z1), bz = Math.max(z0, z1);
+        for (let x = ax; x <= bx; x++)
+          for (let y = ay; y <= by; y++)
+            for (let z = az; z <= bz; z++)
+              if (x === ax || x === bx || y === ay || y === by || z === az || z === bz)
+                this.set(x, y, z, this._resolve(m, x, y, z));
+      }
+
+      sphere(cx, cy, cz, r, m) {
+        const r2 = r * r, R = Math.ceil(r);
+        for (let dx = -R; dx <= R; dx++)
+          for (let dy = -R; dy <= R; dy++)
+            for (let dz = -R; dz <= R; dz++)
+              if (dx * dx + dy * dy + dz * dz <= r2)
+                this.set(cx + dx, cy + dy, cz + dz, this._resolve(m, cx + dx, cy + dy, cz + dz));
+      }
+
+      line(x0, y0, z0, x1, y1, z1, m, radius = 0) {
+        const steps = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0, z1 - z0) * 2.2));
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          const px = x0 + (x1 - x0) * t;
+          const py = y0 + (y1 - y0) * t;
+          const pz = z0 + (z1 - z0) * t;
+          if (radius <= 0.2) this.set(px, py, pz, this._resolve(m, Math.round(px), Math.round(py), Math.round(pz)));
+          else this.sphere(px, py, pz, radius, m);
+        }
+      }
+
+      exportData() {
+        return {
+          name: this.name,
+          author: this.author,
+          description: this.description,
+          voxels: Array.from(this.cells.values()),
+        };
+      }
+
+      mountToScene(scene) {
+        const fullGeo = new THREE.BoxGeometry(1, 1, 1);
+        const slabGeo = new THREE.BoxGeometry(1, 0.5, 1);
+        const groups = new Map();
+        let minX = Infinity, minY = Infinity, minZ = Infinity;
+        let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+
+        const isOccluding = (cell) =>
+          Boolean(cell && (cell.opacity ?? 1) >= 0.95 && !cell.slab);
+
+        for (const v of this.cells.values()) {
+          if (v.x < minX) minX = v.x; if (v.x > maxX) maxX = v.x;
+          if (v.y < minY) minY = v.y; if (v.y > maxY) maxY = v.y;
+          if (v.z < minZ) minZ = v.z; if (v.z > maxZ) maxZ = v.z;
+
+          // Cull 100% enclosed interior solid cubes from WebGL (keeps __VOXEL_DATA__ intact!)
+          if (
+            isOccluding(v) &&
+            isOccluding(this.cells.get(`${v.x + 1},${v.y},${v.z}`)) &&
+            isOccluding(this.cells.get(`${v.x - 1},${v.y},${v.z}`)) &&
+            isOccluding(this.cells.get(`${v.x},${v.y + 1},${v.z}`)) &&
+            isOccluding(this.cells.get(`${v.x},${v.y - 1},${v.z}`)) &&
+            isOccluding(this.cells.get(`${v.x},${v.y},${v.z + 1}`)) &&
+            isOccluding(this.cells.get(`${v.x},${v.y},${v.z - 1}`))
+          ) {
+            continue;
+          }
+
+          const key = `${v.color}|${v.opacity ?? 1}|${v.emissive ?? ''}|${v.isLight ? 1 : 0}|${v.block ?? ''}|${v.slab ?? 'full'}`;
+          if (!groups.has(key)) groups.set(key, { proto: v, items: [] });
+          groups.get(key).items.push(v);
+        }
+
+        const root = new THREE.Group();
+        const mat4 = new THREE.Matrix4();
+
+        const sortedGroups = Array.from(groups.values()).sort((a, b) => {
+          const ga = (a.proto.opacity ?? 1) < 0.85 ? 1 : 0;
+          const gb = (b.proto.opacity ?? 1) < 0.85 ? 1 : 0;
+          return ga - gb;
+        });
+
+        for (const { proto, items } of sortedGroups) {
+          const isGlass = (proto.opacity ?? 1) < 0.85;
+          const isLight = Boolean(proto.isLight || proto.emissive);
+          const material = new THREE.MeshStandardMaterial({
+            color: new THREE.Color(proto.color || '#cccccc'),
+            roughness: isGlass ? 0.14 : 0.8,
+            metalness: 0.05,
+            transparent: isGlass,
+            opacity: proto.opacity ?? 1.0,
+            depthWrite: !isGlass,
+            emissive: isLight ? new THREE.Color(proto.emissive || proto.color) : new THREE.Color(0x000000),
+            emissiveIntensity: isLight ? (proto.emissiveIntensity ?? 0.95) : 0,
+          });
+          if (proto.block) material.userData.block = proto.block;
+
+          const isSlab = proto.slab === 'bottom' || proto.slab === 'top';
+          const yOff = isSlab ? (proto.slab === 'top' ? 0.75 : 0.25) : 0.5;
+          const inst = new THREE.InstancedMesh(isSlab ? slabGeo : fullGeo, material, items.length);
+          inst.castShadow = !isGlass;
+          inst.receiveShadow = true;
+          items.forEach((v, i) => {
+            mat4.makeTranslation(v.x + 0.5, v.y + yOff, v.z + 0.5);
+            inst.setMatrixAt(i, mat4);
+          });
+          inst.instanceMatrix.needsUpdate = true;
+          root.add(inst);
+        }
+
+        scene.add(root);
+        return {
+          center: new THREE.Vector3((minX + maxX + 1) * 0.5, (minY + maxY + 1) * 0.43, (minZ + maxZ + 1) * 0.5),
+          size: new THREE.Vector3(maxX - minX + 1, maxY - minY + 1, maxZ - minZ + 1),
+        };
+      }
+    }
+
+    // ==================== Palette Definitions ====================
+    const MAT = {
+      // Cliff & Terrain
+      deepTile:    { color: '#363637', block: 'minecraft:deepslate_tiles' },
+      deepBrick:   { color: '#464647', block: 'minecraft:deepslate_bricks' },
+      polDeep:     { color: '#484849', block: 'minecraft:polished_deepslate' },
+      tuff:        { color: '#6c6d66', block: 'minecraft:tuff' },
+      stoneBrick:  { color: '#7a797a', block: 'minecraft:stone_bricks' },
+      mossyBrick:  { color: '#737969', block: 'minecraft:mossy_stone_bricks' },
+      andesite:    { color: '#888888', block: 'minecraft:andesite' },
+      moss:        { color: '#596d2d', block: 'minecraft:moss_block' },
+      grassLush:   { color: '#546d1b', block: 'minecraft:green_wool' },
+      pathDiorite: { color: '#c0c1c2', block: 'minecraft:polished_diorite' },
+      quartz:      { color: '#ede6df', block: 'minecraft:smooth_quartz' },
+
+      // Architecture (Pagoda, Torii, Bridge, Pavilion)
+      blackstone:  { color: '#302a31', block: 'minecraft:polished_blackstone_bricks' },
+      redPillar:   { color: '#8e2121', block: 'minecraft:red_concrete' },
+      mangrove:    { color: '#753630', block: 'minecraft:mangrove_planks' },
+      spruceLog:   { color: '#3a2510', block: 'minecraft:spruce_wood' },
+      sprucePlank: { color: '#725430', block: 'minecraft:spruce_planks' },
+      darkOak:     { color: '#422b14', block: 'minecraft:dark_oak_planks' },
+      oakPlank:    { color: '#a2824e', block: 'minecraft:oak_planks' },
+      birchPlank:  { color: '#c0af79', block: 'minecraft:birch_planks' },
+      whiteWall:   { color: '#dfe0dc', block: 'minecraft:calcite' },
+      warmWall:    { color: '#d1b2a1', block: 'minecraft:white_terracotta' },
+      roofDark:    { color: '#335b4b', block: 'minecraft:dark_prismarine' },
+      roofCopper:  { color: '#52a284', block: 'minecraft:oxidized_copper' },
+      roofEdge:    { color: '#363637', block: 'minecraft:deepslate_tiles' },
+      goldAccent:  { color: '#f1af15', block: 'minecraft:yellow_concrete' },
+      copperWarm:  { color: '#c06b4f', block: 'minecraft:copper_block' },
+      amethyst:    { color: '#8561bf', block: 'minecraft:amethyst_block' },
+
+      // Half-Slabs (0.5 block architectural precision)
+      slabStoneB:  { color: '#7a797a', block: 'minecraft:stone_brick_slab', slab: 'bottom' },
+      slabDiorB:   { color: '#c0c1c2', block: 'minecraft:polished_diorite_slab', slab: 'bottom' },
+      slabRoofB:   { color: '#335b4b', block: 'minecraft:dark_prismarine_slab', slab: 'bottom' },
+      slabRoofT:   { color: '#335b4b', block: 'minecraft:dark_prismarine_slab', slab: 'top' },
+      slabCopB:    { color: '#52a284', block: 'minecraft:oxidized_cut_copper_slab', slab: 'bottom' },
+      slabDeepB:   { color: '#363637', block: 'minecraft:deepslate_tile_slab', slab: 'bottom' },
+      slabSpruceB: { color: '#725430', block: 'minecraft:spruce_slab', slab: 'bottom' },
+      slabSpruceT: { color: '#725430', block: 'minecraft:spruce_slab', slab: 'top' },
+
+      // Foliage
+      cherryLeaf:  { color: '#e5b1c7', block: 'minecraft:cherry_leaves' },
+      cherryPink:  { color: '#ed8dac', block: 'minecraft:pink_wool' },
+      azaleaLeaf:  { color: '#59732d', block: 'minecraft:azalea_leaves' },
+      spruceLeaf:  { color: '#365536', block: 'minecraft:spruce_leaves' },
+      bamboo:      { color: '#5ea918', block: 'minecraft:lime_concrete' },
+
+      // Translucent Water, Steam, Clouds & Windows
+      waterDeep:   { color: '#4c7f99', opacity: 0.56, block: 'minecraft:cyan_stained_glass' },
+      waterBright: { color: '#6699d8', opacity: 0.50, block: 'minecraft:light_blue_stained_glass' },
+      foamCloud:   { color: '#ffffff', opacity: 0.42, block: 'minecraft:white_stained_glass' },
+      windowGold:  { color: '#e5e533', opacity: 0.52, block: 'minecraft:yellow_stained_glass' },
+      windowAmber: { color: '#d87f33', opacity: 0.52, block: 'minecraft:orange_stained_glass' },
+
+      // Emissive Lights
+      ochreLight:  { color: '#faf5ce', emissive: '#ffd269', emissiveIntensity: 1.0, isLight: true, block: 'minecraft:ochre_froglight' },
+      shroomLight: { color: '#f09246', emissive: '#ff8533', emissiveIntensity: 1.0, isLight: true, block: 'minecraft:shroomlight' },
+      pearlLight:  { color: '#f5e0ef', emissive: '#ff9ee6', emissiveIntensity: 0.95, isLight: true, block: 'minecraft:pearlescent_froglight' },
+      seaLantern:  { color: '#acdbc2', emissive: '#7fffe8', emissiveIntensity: 0.95, isLight: true, block: 'minecraft:sea_lantern' },
+    };
+
+    const world = new VoxelWorld({
+      name: 'Cloudsea_Pagoda_Sanctuary',
+      description: 'Grand 5-story East Asian floating pagoda keep with hot spring waterfall, arched bridge, torii gate & ancient cherry tree',
+    });
+
+    // ==================== 1. Sculpt Floating Main Sanctuary Cliff + Secondary Islet ====================
+    function buildFloatingIsland(cx, cz, topY, baseRadius, maxDepth) {
+      const bound = Math.ceil(baseRadius + 5);
+      for (let x = cx - bound; x <= cx + bound; x++) {
+        for (let z = cz - bound; z <= cz + bound; z++) {
+          const dx = x - cx, dz = z - cz;
+          const angle = Math.atan2(dz, dx);
+          const dist = Math.hypot(dx, dz);
+          const rimR =
+            baseRadius +
+            2.3 * Math.sin(angle * 3 + 0.6) +
+            1.5 * Math.cos(angle * 5 - 0.8) +
+            1.1 * noise2(x, z);
+
+          if (dist > rimR) continue;
+
+          const norm = dist / rimR; // 0 at center .. 1 at cliff rim
+          const stalactiteMod =
+            Math.pow(Math.max(0, 1 - norm * norm), 1.35) *
+            (0.76 + 0.28 * Math.sin(x * 0.55) * Math.cos(z * 0.55) + 0.16 * noise2(x * 1.8, z * 1.8));
+          const depth = Math.max(2, Math.round(maxDepth * stalactiteMod));
+          const bottomY = Math.max(0, topY - depth);
+
+          // Shell-optimized cliff construction (hollow deep interior, solid 2-block outer crust!)
+          for (let y = bottomY; y <= topY; y++) {
+            const isCrust = y >= topY - 1 || y <= bottomY + 2 || norm > 0.82;
+            if (!isCrust) continue;
+
+            if (y === topY) {
+              world.set(x, y, z, hash3(x, y, z) < 0.32 ? MAT.grassLush : MAT.moss);
+            } else if (y >= topY - 4) {
+              const h = hash3(x, y, z);
+              world.set(x, y, z, h < 0.35 ? MAT.tuff : h < 0.7 ? MAT.stoneBrick : MAT.mossyBrick);
+            } else {
+              const h = hash3(x, y, z);
+              world.set(x, y, z, h < 0.45 ? MAT.deepTile : h < 0.8 ? MAT.deepBrick : MAT.polDeep);
+            }
+          }
+        }
+      }
+    }
+
+    // Main Sanctuary Island (center 32, 32, top Y=20)
+    buildFloatingIsland(32, 32, 20, 22.5, 20);
+
+    // Secondary Tea-Pavilion Floating Islet (center 64, 34, top Y=18)
+    buildFloatingIsland(64, 34, 18, 9.2, 13);
+
+    // Glowing Azure Crystal Veins embedded under the main cliff overhang!
+    for (const [gx, gy, gz] of [[24, 10, 46], [39, 9, 45], [18, 12, 36], [44, 11, 24]]) {
+      world.sphere(gx, gy, gz, 1.8, (x, y, z) =>
+        hash3(x, y, z) < 0.3 ? MAT.seaLantern : hash3(x, y, z) < 0.65 ? MAT.amethyst : MAT.waterDeep
+      );
+    }
+
+    // ==================== 2. Ceremonial Courtyard Terrace & Grand Torii Gate (+Z Front) ====================
+    // Raised stone sanctuary terrace (X: 21..43, Z: 19..41, Y: 21)
+    world.fillBox(21, 21, 19, 43, 21, 41, (x, y, z) => {
+      if (x === 21 || x === 43 || z === 19 || z === 41) return MAT.blackstone;
+      return (x + z) % 2 === 0 ? MAT.pathDiorite : MAT.stoneBrick;
+    });
+
+    // Paved approach avenue from front cliff (Z: 42..52, X: 29..35, Y: 20)
+    for (let z = 42; z <= 52; z++) {
+      for (let x = 29; x <= 35; x++) {
+        if (world.has(x, 20, z)) {
+          world.set(x, 20, z, x === 29 || x === 35 ? MAT.stoneBrick : MAT.pathDiorite);
+        }
+      }
+    }
+    // Half-slab front entrance steps onto courtyard (Z=42)
+    for (let x = 30; x <= 34; x++) {
+      world.set(x, 21, 42, MAT.slabDiorB);
+    }
+
+    // Grand Vermilion Torii Gate at Z = 48, X = 27..37
+    world.fillBox(27, 20, 47, 29, 21, 49, MAT.blackstone); // Left pedestal
+    world.fillBox(35, 20, 47, 37, 21, 49, MAT.blackstone); // Right pedestal
+    world.fillBox(28, 22, 48, 28, 30, 48, MAT.redPillar);  // Left pillar
+    world.fillBox(36, 22, 48, 36, 30, 48, MAT.redPillar);  // Right pillar
+    world.fillBox(26, 28, 48, 38, 28, 48, MAT.redPillar);  // Lower tie beam (Nuki)
+    world.set(32, 29, 48, MAT.ochreLight);                 // Center golden tablet (Gakuzuka)
+    world.fillBox(25, 30, 48, 39, 30, 48, MAT.redPillar);  // Upper lintel
+    world.fillBox(24, 31, 47, 40, 31, 49, MAT.deepTile);   // Kasagi cap roof
+    // Upturned Torii roof tips!
+    world.set(23, 32, 48, MAT.deepTile);
+    world.set(41, 32, 48, MAT.deepTile);
+    world.set(24, 32, 48, MAT.slabDeepB);
+    world.set(40, 32, 48, MAT.slabDeepB);
+
+    // Pair of Stone Toro Lanterns flanking avenue
+    function placeStoneLantern(lx, ly, lz) {
+      world.set(lx, ly, lz, MAT.stoneBrick);
+      world.set(lx, ly + 1, lz, MAT.andesite);
+      world.set(lx, ly + 2, lz, MAT.shroomLight);
+      world.fillBox(lx - 1, ly + 3, lz - 1, lx + 1, ly + 3, lz + 1, MAT.slabStoneB);
+      world.set(lx, ly + 3, lz, MAT.stoneBrick);
+      world.set(lx, ly + 4, lz, MAT.slabStoneB);
+    }
+    placeStoneLantern(27, 21, 44);
+    placeStoneLantern(37, 21, 44);
+    placeStoneLantern(23, 22, 39);
+    placeStoneLantern(41, 22, 39);
+
+    // ==================== 3. 5-Story Grand Sweeping-Eave Pagoda Keep (Center 32, 30) ====================
+    const PX = 32, PZ = 30;
+
+    // Helper: Build an authentic East Asian sweeping upturned roof with parabolic corner lift & corner lanterns!
+    function buildSweepingPagodaRoof(cx, cz, baseY, halfW, roofHeight, addCornerLanterns = true) {
+      const overhang = 3;
+      const totalR = halfW + overhang;
+
+      for (let dx = -totalR; dx <= totalR; dx++) {
+        for (let dz = -totalR; dz <= totalR; dz++) {
+          const cheb = Math.max(Math.abs(dx), Math.abs(dz));
+          const euclid = Math.hypot(dx, dz);
+          if (cheb < halfW - 1) continue; // Keep interior hollow
+
+          const t = (totalR - cheb) / overhang; // 0 at outer rim .. 1+ inward
+          let ry = baseY + Math.floor(Math.max(0, t * 1.4));
+
+          // Upturned corner curve (翘角飞檐) near diagonal corners!
+          const diagFactor = Math.max(0, (euclid - totalR * 1.08) / (totalR * 0.34));
+          const cornerLift = Math.round(diagFactor * 2.1);
+          ry += cornerLift;
+
+          const isRidge = Math.abs(dx) === Math.abs(dz) || dx === 0 || dz === 0;
+          const isOuterRim = cheb === totalR;
+          const mat = isOuterRim
+            ? MAT.roofEdge
+            : isRidge
+            ? MAT.roofCopper
+            : (dx + dz) % 3 === 0
+            ? MAT.roofCopper
+            : MAT.roofDark;
+
+          world.set(cx + dx, ry, cz + dz, mat);
+
+          // Smooth half-slab transition on mid-slope!
+          if (!isOuterRim && !isRidge && cornerLift === 0 && !world.has(cx + dx, ry + 1, cz + dz)) {
+            if ((cheb + baseY) % 2 === 0) {
+              world.set(cx + dx, ry + 1, cz + dz, MAT.slabRoofB);
+            }
+          }
+        }
+      }
+
+      // Upper pitched tier connecting eave skirt to next story wall
+      for (let step = 1; step <= roofHeight; step++) {
+        const w = Math.max(2, halfW + 1 - step);
+        const y = baseY + 1 + step;
+        for (let dx = -w; dx <= w; dx++) {
+          for (let dz = -w; dz <= w; dz++) {
+            if (Math.max(Math.abs(dx), Math.abs(dz)) === w) {
+              const isRidge = Math.abs(dx) === Math.abs(dz) || dx === 0 || dz === 0;
+              world.set(cx + dx, y, cz + dz, isRidge ? MAT.roofCopper : MAT.roofDark);
+            }
+          }
+        }
+      }
+
+      // 4 Hanging Glowing Corner Wind-Lanterns!
+      if (addCornerLanterns) {
+        for (const sx of [-1, 1]) {
+          for (const sz of [-1, 1]) {
+            const lx = cx + sx * totalR;
+            const lz = cz + sz * totalR;
+            let topCornerY = baseY + 3;
+            while (topCornerY > baseY && !world.has(lx, topCornerY, lz)) topCornerY--;
+            world.set(lx, topCornerY - 1, lz, MAT.darkOak);
+            world.set(lx, topCornerY - 2, lz, MAT.shroomLight);
+          }
+        }
+      }
+    }
+
+    // --- Story 1: Battered Stone Castle Base (Ishigaki, Y=22..29, halfW=9 -> 8) ---
+    world.hollowBox(PX - 9, 22, PZ - 9, PX + 9, 25, PZ + 9, (x, y, z) => {
+      const isCorner = (Math.abs(x - PX) === 9) && (Math.abs(z - PZ) === 9);
+      if (isCorner) return MAT.blackstone;
+      return hash3(x, y, z) < 0.25 ? MAT.mossyBrick : MAT.stoneBrick;
+    });
+    world.hollowBox(PX - 8, 26, PZ - 8, PX + 8, 29, PZ + 8, (x, y, z) => {
+      const isCorner = (Math.abs(x - PX) === 8) && (Math.abs(z - PZ) === 8);
+      return isCorner ? MAT.redPillar : hash3(x, y, z) < 0.3 ? MAT.warmWall : MAT.whiteWall;
+    });
+
+    // Grand Arched Gateways on Front (+Z) & Back (-Z) + Interior Pillar Hall & Staircase!
+    world.clearBox(PX - 2, 22, PZ + 8, PX + 2, 26, PZ + 9);
+    world.clearBox(PX - 2, 22, PZ - 9, PX + 2, 25, PZ - 8);
+    world.fillBox(PX - 3, 27, PZ + 9, PX + 3, 27, PZ + 9, MAT.spruceLog);
+    world.set(PX, 27, PZ + 9, MAT.ochreLight);
+
+    // Interior warm lanterns & wooden spiral stair inside Story 1 (visible in Y-layer slice!)
+    for (const [ix, iz] of [[-5, -5], [5, -5], [-5, 5], [5, 5]]) {
+      world.fillBox(PX + ix, 22, PZ + iz, PX + ix, 29, PZ + iz, MAT.spruceLog);
+      world.set(PX + ix, 26, PZ + iz - Math.sign(iz), MAT.ochreLight);
+    }
+    for (let s = 0; s < 8; s++) {
+      world.fillBox(PX - 6 + s, 22 + s, PZ - 6, PX - 6 + s, 22 + s, PZ - 5, MAT.oakPlank);
+    }
+
+    buildSweepingPagodaRoof(PX, PZ, 29, 8, 2, true);
+
+    // --- Stories 2, 3, 4, 5: Diminishing Red-and-White Timber Tiers ---
+    const tiers = [
+      { y0: 32, h: 6, hw: 7, balcony: true },
+      { y0: 40, h: 6, hw: 6, balcony: false },
+      { y0: 48, h: 5, hw: 5, balcony: true },
+      { y0: 55, h: 5, hw: 4, balcony: false },
+    ];
+
+    for (const tier of tiers) {
+      const { y0, h, hw, balcony } = tier;
+      const yTop = y0 + h - 1;
+
+      // Walkable wooden floor deck (with stairwell opening)
+      world.fillBox(PX - hw, y0, PZ - hw, PX + hw, y0, PZ + hw, MAT.sprucePlank);
+      world.clearBox(PX - 2, y0, PZ - 2, PX - 1, y0, PZ - 1);
+
+      // Optional wrap-around wooden balcony & railing
+      if (balcony) {
+        const bw = hw + 2;
+        for (let dx = -bw; dx <= bw; dx++) {
+          for (let dz = -bw; dz <= bw; dz++) {
+            const c = Math.max(Math.abs(dx), Math.abs(dz));
+            if (c === bw - 1) world.set(PX + dx, y0, PZ + dz, MAT.sprucePlank);
+            if (c === bw) {
+              world.set(PX + dx, y0, PZ + dz, MAT.darkOak);
+              if ((dx + dz) % 2 === 0) world.set(PX + dx, y0 + 1, PZ + dz, MAT.slabSpruceB);
+              if (Math.abs(dx) === bw && Math.abs(dz) === bw) {
+                world.set(PX + dx, y0 + 1, PZ + dz, MAT.redPillar);
+              }
+            }
+          }
+        }
+      }
+
+      // Hollow White Plaster Walls + Proud Vermilion Pillars + Glowing Shoji Windows!
+      world.hollowBox(PX - hw, y0 + 1, PZ - hw, PX + hw, yTop, PZ + hw, (x, y, z) => {
+        const ax = Math.abs(x - PX), az = Math.abs(z - PZ);
+        if ((ax === hw && az === hw) || (ax === hw && az % 3 === 0) || (az === hw && ax % 3 === 0)) {
+          return MAT.redPillar;
+        }
+        if (y === yTop) return MAT.spruceLog;
+        return hash3(x, y, z) < 0.25 ? MAT.warmWall : MAT.whiteWall;
+      });
+
+      // Glowing stained-glass windows on all 4 faces backed by interior froglights!
+      const winSpan = Math.max(1, hw - 3);
+      for (let d = -winSpan; d <= winSpan; d++) {
+        if (Math.abs(d) % 3 === 0 && hw > 4) continue;
+        for (let wy = y0 + 2; wy <= yTop - 1; wy++) {
+          const winMat = (wy + d) % 2 === 0 ? MAT.windowGold : MAT.windowAmber;
+          world.set(PX + d, wy, PZ + hw, winMat);
+          world.set(PX + d, wy, PZ - hw, winMat);
+          world.set(PX + hw, wy, PZ + d, winMat);
+          world.set(PX - hw, wy, PZ + d, winMat);
+        }
+      }
+      // Interior central lantern chandelier per floor
+      world.set(PX, yTop - 1, PZ, MAT.ochreLight);
+      world.set(PX + (hw - 2), y0 + 2, PZ + (hw - 2), MAT.ochreLight);
+      world.set(PX - (hw - 2), y0 + 2, PZ + (hw - 2), MAT.ochreLight);
+
+      buildSweepingPagodaRoof(PX, PZ, yTop, hw, 2, true);
+    }
+
+    // --- Golden Sorin Spire Crown (黄金九轮宝顶, Y = 62..71) ---
+    world.fillBox(PX - 1, 62, PZ - 1, PX + 1, 63, PZ + 1, MAT.goldAccent);
+    for (let sy = 64; sy <= 70; sy++) {
+      world.set(PX, sy, PZ, sy % 2 === 0 ? MAT.goldAccent : MAT.copperWarm);
+      if (sy === 65 || sy === 67) {
+        for (const [ox, oz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+          world.set(PX + ox, sy, PZ + oz, MAT.slabCopB);
+        }
+      }
+    }
+    world.set(PX, 71, PZ, MAT.ochreLight); // Celestial top beacon!
+
+    // ==================== 4. Vermilion Arched Drum Bridge + Octagonal Tea Pavilion (+X East) ====================
+    // Bridge spans X = 48 .. 56, Z = 32 .. 36 connecting Main Cliff (Y=20) to Tea Islet (Y=18)
+    for (let x = 47; x <= 57; x++) {
+      const t = (x - 47) / 10; // 0 .. 1
+      const archLift = Math.sin(t * Math.PI) * 3.2;
+      const baseEnd = 20 * (1 - t) + 18 * t;
+      const exactY = baseEnd + archLift;
+      const deckY = Math.floor(exactY);
+      const frac = exactY - deckY;
+
+      for (let z = 32; z <= 36; z++) {
+        const isRail = z === 32 || z === 36;
+        if (!isRail) {
+          world.set(x, deckY, z, MAT.sprucePlank);
+          // Smooth half-slab walking tread on fractional arch steps!
+          if (frac >= 0.42) {
+            world.set(x, deckY + 1, z, MAT.slabSpruceB);
+          }
+          // Underside dark oak arch rib
+          world.set(x, deckY - 1, z, MAT.darkOak);
+        } else {
+          world.set(x, deckY, z, MAT.redPillar);
+          world.set(x, deckY + 1, z, MAT.redPillar);
+          if (x === 48 || x === 52 || x === 56) {
+            world.set(x, deckY + 2, z, MAT.redPillar);
+            if (x === 52) world.set(x, deckY + 3, z, MAT.pearlLight);
+          } else {
+            world.set(x, deckY + 2, z, MAT.slabSpruceB);
+          }
+        }
+      }
+    }
+
+    // Octagonal Star-Gazing Tea Pavilion on Secondary Islet (center X=64, Z=34, Y=19..30)
+    const TX = 64, TZ = 34;
+    for (let dx = -5; dx <= 5; dx++) {
+      for (let dz = -5; dz <= 5; dz++) {
+        if (Math.abs(dx) + Math.abs(dz) <= 7) {
+          world.set(TX + dx, 19, TZ + dz, Math.max(Math.abs(dx), Math.abs(dz)) === 5 ? MAT.blackstone : MAT.quartz);
+        }
+      }
+    }
+    // 8 Pavilion Columns
+    for (const [px, pz] of [[-4,-2],[-4,2],[4,-2],[4,2],[-2,-4],[2,-4],[-2,4],[2,4]]) {
+      world.fillBox(TX + px, 20, TZ + pz, TX + px, 24, TZ + pz, MAT.redPillar);
+    }
+    // Warm Tea Table & Brazier inside pavilion
+    world.fillBox(TX - 1, 20, TZ - 1, TX + 1, 20, TZ + 1, MAT.darkOak);
+    world.set(TX, 21, TZ, MAT.shroomLight);
+
+    buildSweepingPagodaRoof(TX, TZ, 24, 4, 3, true);
+    world.set(TX, 29, TZ, MAT.goldAccent);
+    world.set(TX, 30, TZ, MAT.pearlLight);
+
+    // ==================== 5. Emerald Hot-Spring Terrace + Cliffside Stained-Glass Waterfall (-X/+Z) ====================
+    // Carve warm hot-spring pool at X: 14..23, Z: 34..43, surface Y=20
+    for (let x = 13; x <= 24; x++) {
+      for (let z = 33; z <= 45; z++) {
+        const dist = Math.hypot((x - 18.5) * 1.0, (z - 39) * 0.9);
+        if (dist <= 5.2) {
+          world.set(x, 18, z, dist < 2.2 ? MAT.seaLantern : MAT.roofDark);
+          world.set(x, 19, z, MAT.waterDeep);
+          world.set(x, 20, z, hash3(x, 20, z) < 0.45 ? MAT.waterBright : MAT.waterDeep);
+        } else if (dist <= 6.5 && world.has(x, 20, z)) {
+          // Natural mossy boulder rim around hot spring
+          const rimH = hash3(x, 21, z) < 0.35 ? 22 : 21;
+          for (let ry = 20; ry <= rimH; ry++) {
+            world.set(x, ry, z, hash3(x, ry, z) < 0.4 ? MAT.mossyBrick : MAT.tuff);
+          }
+        }
+      }
+    }
+
+    // Rising Hot-Spring Steam Wisps (translucent white stained glass)
+    for (const [sx, sy, sz] of [[17, 22, 38], [17, 23, 39], [20, 22, 40], [20, 24, 40], [18, 25, 38]]) {
+      world.set(sx, sy, sz, MAT.foamCloud);
+    }
+
+    // Cliffside Waterfall channel flowing to front-left rim (X: 18..21, Z: 44..51) and plunging to Y=3!
+    for (let z = 43; z <= 49; z++) {
+      for (let x = 18; x <= 21; x++) {
+        world.set(x, 19, z, MAT.deepBrick);
+        world.set(x, 20, z, (x + z) % 2 === 0 ? MAT.waterBright : MAT.waterDeep);
+        world.del(x, 21, z);
+        world.del(x, 22, z);
+      }
+    }
+    // Vertical plunging waterfall curtain + misty plunge foam cloud at bottom!
+    for (let y = 3; y <= 20; y++) {
+      const zShift = y < 12 ? 1 : 0;
+      for (let x = 18; x <= 21; x++) {
+        const wMat = (x + y) % 3 === 0 ? MAT.foamCloud : (x + y) % 2 === 0 ? MAT.waterBright : MAT.waterDeep;
+        world.set(x, y, 49 + zShift, wMat);
+        if (y > 10 && (x === 19 || x === 20)) {
+          world.set(x, y, 50 + zShift, MAT.waterBright);
+        }
+      }
+    }
+    // Misty splash cloud cluster at base of waterfall (Y = 2..5, Z = 50..52)
+    world.sphere(19.5, 3.5, 50.5, 2.8, (x, y, z) =>
+      hash3(x, y, z) < 0.25 ? MAT.seaLantern : MAT.foamCloud
+    );
+
+    // ==================== 6. Ancient Gnarled Weeping Cherry Tree (X=16, Z=23) ====================
+    // Twisting trunk & roots
+    world.line(15, 20, 24, 16, 26, 23, MAT.spruceLog, 1.3);
+    world.line(16, 26, 23, 14, 32, 21, MAT.spruceLog, 1.0);
+    world.line(16, 25, 23, 20, 31, 25, MAT.spruceLog, 0.9);
+    world.line(16, 26, 23, 13, 30, 27, MAT.spruceLog, 0.8);
+
+    const blossomClusters = [
+      [14, 33, 21, 4.8],
+      [19, 32, 25, 4.2],
+      [12, 31, 27, 3.8],
+      [16, 35, 23, 4.4],
+      [11, 32, 20, 3.4],
+      [21, 30, 21, 3.2],
+    ];
+    for (const [bx, by, bz, br] of blossomClusters) {
+      world.sphere(bx, by, bz, br, (x, y, z) => {
+        const h = hash3(x, y, z);
+        if (h < 0.16) return null; // Natural airy blossom gaps
+        return h < 0.42 ? MAT.cherryPink : MAT.cherryLeaf;
+      });
+    }
+    // Weeping cherry blossom strands & glowing blossom lanterns
+    for (const [wx, wy, wz] of [[11, 29, 27], [19, 29, 26], [13, 30, 18], [21, 28, 22]]) {
+      world.set(wx, wy, wz, MAT.cherryLeaf);
+      world.set(wx, wy - 1, wz, MAT.cherryPink);
+      world.set(wx, wy - 2, wz, MAT.pearlLight);
+    }
+
+    // Lush Bamboo Grove & Pine accents on Rear-Right Cliff (X=45, Z=20)
+    for (const [bx, bz, bh] of [[45, 20, 9], [47, 21, 11], [46, 18, 8], [48, 19, 10], [44, 17, 7]]) {
+      if (world.has(bx, 20, bz)) {
+        world.fillBox(bx, 21, bz, bx, 20 + bh, bz, MAT.bamboo);
+        world.sphere(bx, 20 + bh, bz, 1.5, MAT.azaleaLeaf);
+      }
+    }
+
+    // ==================== 7. Sweeping Cloudsea Ribbon & Drifting Sky Lanterns ====================
+    for (let i = 0; i <= 48; i++) {
+      const ang = (i / 48) * Math.PI * 1.65 - 0.5;
+      const rad = 28.5 + Math.sin(i * 0.4) * 2.5;
+      const cx = Math.round(35 + Math.cos(ang) * rad);
+      const cz = Math.round(33 + Math.sin(ang) * rad);
+      const cy = Math.round(11 + Math.sin(i * 0.25) * 3.5);
+      world.sphere(cx, cy, cz, 2.1, (x, y, z) =>
+        hash3(x, y, z) < 0.28 ? MAT.whiteWall : MAT.foamCloud
+      );
+    }
+
+    // Drifting Sky Lanterns (孔明灯) ascending around the pagoda!
+    const skyLanterns = [
+      [18, 44, 38], [46, 49, 42], [22, 56, 24], [48, 58, 26],
+      [58, 39, 44], [14, 38, 46], [38, 64, 40], [25, 65, 35],
+    ];
+    for (const [lx, ly, lz] of skyLanterns) {
+      world.set(lx, ly, lz, MAT.slabSpruceT);
+      world.set(lx, ly + 1, lz, (lx + ly) % 2 === 0 ? MAT.shroomLight : MAT.ochreLight);
+    }
+
+    // Expose structured 1:1 data (including explicit half-slabs!) to three2litematic
+    window.__VOXEL_DATA__ = world.exportData();
+
+    // ==================== 8. Interactive Three.js WebGL Viewport ====================
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color('#0a101d');
+    scene.fog = new THREE.FogExp2('#0a101d', 0.0042);
+
+    const { center, size } = world.mountToScene(scene);
+    const maxDim = Math.max(size.x, size.y, size.z);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 2000);
+    camera.position.set(center.x + maxDim * 0.98, center.y + maxDim * 0.62, center.z + maxDim * 1.08);
+
+    const useRealtimeShadows = world.cells.size <= 6000;
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    renderer.shadowMap.enabled = useRealtimeShadows;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.copy(center);
+    controls.enableDamping = true;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.45;
+
+    scene.add(new THREE.HemisphereLight(0xdbeafe, 0x1e293b, 0.85));
+    const sun = new THREE.DirectionalLight(0xfff3e0, 1.45);
+    sun.position.set(95, 120, 85);
+    sun.castShadow = useRealtimeShadows;
+    scene.add(sun);
+
+    // Subtle warm point lights on Pagoda, Torii & Tea Pavilion
+    const p1 = new THREE.PointLight(0xffaa44, 28, 42);
+    p1.position.set(32, 36, 42);
+    scene.add(p1);
+
+    const p2 = new THREE.PointLight(0x66ffee, 20, 30);
+    p2.position.set(19, 21, 40);
+    scene.add(p2);
+
+    document.getElementById('hud').textContent =
+      `《云海樱泉·五重飞檐浮空阁》 · ${size.x}×${size.y}×${size.z} · ${world.cells.size.toLocaleString()} 体素`;
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    renderer.setAnimationLoop(() => {
+      controls.update();
+      renderer.render(scene, camera);
+    });
+  </script>
+</body>
+</html>

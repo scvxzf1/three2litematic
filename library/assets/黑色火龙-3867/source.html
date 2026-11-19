@@ -1,0 +1,1438 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>暗红黑曜石古龙 · 高精度体素雕塑 (Three.js)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #040711;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: #e6dfd5;
+      user-select: none;
+    }
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    .hud-top {
+      position: fixed;
+      top: 18px;
+      left: 20px;
+      pointer-events: none;
+      z-index: 10;
+      background: rgba(8, 12, 24, 0.58);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 130, 60, 0.22);
+      border-radius: 10px;
+      padding: 12px 16px;
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+      transition: opacity 0.3s ease;
+    }
+    .hud-title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      background: linear-gradient(90deg, #ffcf75, #ff6c2c, #d93636);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 4px;
+    }
+    .hud-sub {
+      font-size: 12px;
+      color: #9aa7bd;
+      line-height: 1.5;
+    }
+    .hud-stats {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 11px;
+      color: #cbbda9;
+      display: flex;
+      gap: 14px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .hud-controls {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 10;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      max-width: 90vw;
+      justify-content: flex-end;
+    }
+    .btn {
+      background: rgba(12, 17, 32, 0.68);
+      backdrop-filter: blur(8px);
+      color: #dfd6c7;
+      border: 1px solid rgba(255, 140, 70, 0.25);
+      border-radius: 8px;
+      padding: 7px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .btn:hover {
+      background: rgba(255, 102, 36, 0.22);
+      border-color: rgba(255, 160, 80, 0.65);
+      color: #fff4e0;
+      transform: translateY(-1px);
+    }
+    .btn.active {
+      background: rgba(255, 95, 30, 0.32);
+      border-color: rgba(255, 175, 95, 0.85);
+      color: #fff;
+    }
+    .hud-hint {
+      position: fixed;
+      bottom: 22px;
+      left: 20px;
+      font-size: 11px;
+      color: rgba(165, 178, 200, 0.68);
+      pointer-events: none;
+      z-index: 10;
+    }
+    #loading {
+      position: fixed;
+      inset: 0;
+      background: #040711;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      padding: 24px;
+      text-align: center;
+      transition: opacity 0.45s ease;
+    }
+    #loading.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .loader-ring {
+      width: 42px;
+      height: 42px;
+      border: 3px solid rgba(255, 120, 40, 0.18);
+      border-top-color: #ff7b29;
+      border-radius: 50%;
+      animation: spin 0.85s linear infinite;
+      margin-bottom: 14px;
+    }
+    #loading-text {
+      font-size: 13px;
+      letter-spacing: 1.2px;
+      color: #d9c4ad;
+      max-width: 520px;
+      line-height: 1.6;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .hidden-ui .hud-top, .hidden-ui .hud-hint { opacity: 0; }
+  </style>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="loading">
+    <div class="loader-ring" id="loader-ring"></div>
+    <div id="loading-text">正在体素化雕刻熔岩古龙与烈焰...</div>
+  </div>
+
+  <div id="canvas-container"></div>
+
+  <div class="hud-top">
+    <div class="hud-title">OBSIDIAN MAGMA WYVERN · 熔岩黑曜石古龙</div>
+    <div class="hud-sub">纯 1×1×1 单位体素 · 样条曲面雕刻 · 立体湍流火息</div>
+    <div class="hud-stats">
+      <span id="stat-voxels">渲染体素: --</span>
+      <span id="stat-raw">原始体积: --</span>
+      <span id="stat-time">生成耗时: --</span>
+    </div>
+  </div>
+
+  <div class="hud-hint">左键拖拽 360° 旋转 · 滚轮缩放 · 右键平移</div>
+
+  <div class="hud-controls">
+    <button class="btn active" data-cam="hero">英雄视角</button>
+    <button class="btn" data-cam="head">龙首喷火</button>
+    <button class="btn" data-cam="wings">巨翼俯瞰</button>
+    <button class="btn" data-cam="side">侧影轮廓</button>
+    <button class="btn" id="btn-toggle-ui">隐藏界面</button>
+  </div>
+
+  <!-- 兜底诊断：若浏览器不支持 importmap 或 CDN 无法访问，给出明确提示 -->
+  <script>
+    window.__VOXEL_DRAGON_READY__ = false;
+    setTimeout(function () {
+      if (!window.__VOXEL_DRAGON_READY__) {
+        var el = document.getElementById('loading-text');
+        if (el && el.textContent.indexOf('出错') === -1) {
+          el.style.color = '#ff9c6e';
+          el.textContent = 'Three.js CDN 模块加载较慢或受网络限制，请确认可访问 cdn.jsdelivr.net 并使用现代浏览器（Chrome / Edge / Safari / Firefox）打开。';
+        }
+      }
+    }, 8000);
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    function showFatalError(err) {
+      console.error(err);
+      const ring = document.getElementById('loader-ring');
+      const txt = document.getElementById('loading-text');
+      if (ring) ring.style.display = 'none';
+      if (txt) {
+        txt.style.color = '#ff7875';
+        txt.textContent = '渲染初始化出错：' + (err && err.message ? err.message : String(err));
+      }
+    }
+
+    try {
+      // =========================================================================
+      // 1. 确定性伪随机与 3D 多倍频噪声 (用于鳞片纹理抖动与火焰湍流)
+      // =========================================================================
+      function hash3(x, y, z) {
+        let n = Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(z, 2147483647);
+        n = (n ^ (n >>> 13)) >>> 0;
+        n = Math.imul(n, 1274126177) >>> 0;
+        return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
+      }
+
+      function valueNoise3D(x, y, z) {
+        const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z);
+        const fx = x - ix, fy = y - iy, fz = z - iz;
+        const ux = fx * fx * (3 - 2 * fx);
+        const uy = fy * fy * (3 - 2 * fy);
+        const uz = fz * fz * (3 - 2 * fz);
+
+        const n000 = hash3(ix, iy, iz),     n100 = hash3(ix + 1, iy, iz);
+        const n010 = hash3(ix, iy + 1, iz), n110 = hash3(ix + 1, iy + 1, iz);
+        const n001 = hash3(ix, iy, iz + 1), n101 = hash3(ix + 1, iy, iz + 1);
+        const n011 = hash3(ix, iy + 1, iz + 1), n111 = hash3(ix + 1, iy + 1, iz + 1);
+
+        const nx00 = n000 + (n100 - n000) * ux;
+        const nx10 = n010 + (n110 - n010) * ux;
+        const nx01 = n001 + (n101 - n001) * ux;
+        const nx11 = n011 + (n111 - n011) * ux;
+
+        const nxy0 = nx00 + (nx10 - nx00) * uy;
+        const nxy1 = nx01 + (nx11 - nx01) * uy;
+        return nxy0 + (nxy1 - nxy0) * uz;
+      }
+
+      function fbm3D(x, y, z, octaves = 3) {
+        let val = 0, amp = 0.5, freq = 1.0, norm = 0;
+        for (let i = 0; i < octaves; i++) {
+          val += amp * valueNoise3D(x * freq, y * freq, z * freq);
+          norm += amp;
+          amp *= 0.5;
+          freq *= 2.05;
+        }
+        return val / norm;
+      }
+
+      function clamp(v, min, max) { return v < min ? min : (v > max ? max : v); }
+      function lerp(a, b, t) { return a + (b - a) * t; }
+      function smoothstep(edge0, edge1, x) {
+        const t = clamp((x - edge0) / (edge1 - edge0), 0, 1);
+        return t * t * (3 - 2 * t);
+      }
+
+      function samplePiecewise(keys, u) {
+        if (u <= keys[0][0]) return keys[0][1];
+        for (let i = 0; i < keys.length - 1; i++) {
+          const [u0, v0] = keys[i];
+          const [u1, v1] = keys[i + 1];
+          if (u <= u1) {
+            return lerp(v0, v1, smoothstep(u0, u1, u));
+          }
+        }
+        return keys[keys.length - 1][1];
+      }
+
+      // 安全的曲线采样封装，杜绝浮点误差导致 u 越界引发崩溃
+      function safePointAt(curve, u) {
+        return curve.getPointAt(clamp(u, 0, 1));
+      }
+      function safeTangentAt(curve, u) {
+        return curve.getTangentAt(clamp(u, 0, 1));
+      }
+
+      // =========================================================================
+      // 2. 材质分类与整数体素网格引擎 (位压缩键值，零重复体素)
+      // =========================================================================
+      const MAT = {
+        SCALES:     0, // 主鳞片 (深猩红/暗酒红/炭黑)
+        BELLY:      1, // 腹甲/胸甲 (暗骨金分节甲片)
+        BONE:       2, // 龙角、背棘、利爪、獠牙 (黑曜石/骨质)
+        MEMBRANE:   3, // 巨翼翼膜 (暗红皮革透光质感)
+        SMOKE:      4, // 火焰边缘黑灰烟雾 (不投射阴影)
+        FIRE_CORE:  5, // 火焰核心与眼珠 (超高亮不经色调压缩，形成辉光感)
+        FIRE_OUTER: 6, // 炽橙/深红外焰与悬浮火星 (高自发光，不投射阴影)
+      };
+
+      const PRIO = {
+        SMOKE:      1,
+        MEMBRANE:   2,
+        FIRE_OUTER: 3,
+        FIRE_CORE:  4,
+        SCALES:     5,
+        BELLY:      6,
+        WING_BONE:  7,
+        HORN_SPINE: 8,
+        FANG_EYE:   9,
+      };
+
+      class VoxelGrid {
+        constructor() {
+          // key: ((x+512)<<20) | ((y+512)<<10) | (z+512)
+          // val: unsigned 32-bit -> r(8) | g(8)<<8 | b(8)<<16 | mat(4)<<24 | prio(4)<<28
+          this.map = new Map();
+        }
+
+        static encodeKey(x, y, z) {
+          return ((x + 512) << 20) | ((y + 512) << 10) | (z + 512);
+        }
+
+        set(x, y, z, r, g, b, mat, prio) {
+          if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return;
+          const ix = Math.round(x), iy = Math.round(y), iz = Math.round(z);
+          if (ix < -500 || ix > 500 || iy < -500 || iy > 500 || iz < -500 || iz > 500) return;
+          const key = VoxelGrid.encodeKey(ix, iy, iz);
+          const existing = this.map.get(key);
+          if (existing !== undefined) {
+            const oldPrio = (existing >>> 28) & 0xF;
+            if (prio < oldPrio) return;
+          }
+          const cr = clamp(Math.round(r), 0, 255);
+          const cg = clamp(Math.round(g), 0, 255);
+          const cb = clamp(Math.round(b), 0, 255);
+          const packed = (((prio & 0xF) << 28) | ((mat & 0xF) << 24) | (cb << 16) | (cg << 8) | cr) >>> 0;
+          this.map.set(key, packed);
+        }
+
+        // 剔除完全被 6 个不透明邻居包裹的内部不可见体素，显著提升帧率并保持 100% 视觉精度
+        extractVisibleBuckets() {
+          const buckets = Array.from({ length: 7 }, () => []);
+          const isSolidCaster = (val) => ((val >>> 24) & 0xF) <= MAT.MEMBRANE;
+
+          for (const [key, val] of this.map.entries()) {
+            const x = ((key >>> 20) & 0x3FF) - 512;
+            const y = ((key >>> 10) & 0x3FF) - 512;
+            const z = (key & 0x3FF) - 512;
+            const mat = (val >>> 24) & 0xF;
+            const selfSolid = mat <= MAT.MEMBRANE;
+
+            const n1 = this.map.get(VoxelGrid.encodeKey(x + 1, y, z));
+            const n2 = this.map.get(VoxelGrid.encodeKey(x - 1, y, z));
+            const n3 = this.map.get(VoxelGrid.encodeKey(x, y + 1, z));
+            const n4 = this.map.get(VoxelGrid.encodeKey(x, y - 1, z));
+            const n5 = this.map.get(VoxelGrid.encodeKey(x, y, z + 1));
+            const n6 = this.map.get(VoxelGrid.encodeKey(x, y, z - 1));
+
+            if (n1 !== undefined && n2 !== undefined && n3 !== undefined &&
+                n4 !== undefined && n5 !== undefined && n6 !== undefined) {
+              if (!selfSolid) continue;
+              if (isSolidCaster(n1) && isSolidCaster(n2) && isSolidCaster(n3) &&
+                  isSolidCaster(n4) && isSolidCaster(n5) && isSolidCaster(n6)) {
+                continue;
+              }
+            }
+
+            buckets[mat].push(x, y, z, val & 0xFF, (val >>> 8) & 0xFF, (val >>> 16) & 0xFF);
+          }
+          return buckets;
+        }
+      }
+
+      // =========================================================================
+      // 3. 像素艺术配色系统 (暗红黑曜石熔岩龙 + 微小像素明度抖动 Jitter)
+      // =========================================================================
+      function jitterColor(r, g, b, x, y, z, amount = 0.08) {
+        const n = (hash3(Math.round(x), Math.round(y), Math.round(z)) - 0.5) * 2.0 * amount;
+        const scale = 1.0 + n;
+        return [r * scale, g * scale, b * scale];
+      }
+
+      function colorScale(x, y, z, dorsalFactor = 0.5) {
+        const mottle = fbm3D(x * 0.18, y * 0.18, z * 0.18, 2);
+        const ridge = clamp(dorsalFactor + (mottle - 0.5) * 0.45, 0, 1);
+        let r, g, b;
+        if (ridge < 0.55) {
+          const t = ridge / 0.55;
+          r = lerp(142, 74, t);
+          g = lerp(23, 13, t);
+          b = lerp(32, 21, t);
+        } else {
+          const t = (ridge - 0.55) / 0.45;
+          r = lerp(74, 28, t);
+          g = lerp(13, 20, t);
+          b = lerp(21, 26, t);
+        }
+        return jitterColor(r, g, b, x, y, z, 0.11);
+      }
+
+      function colorBelly(x, y, z, segmentPhase) {
+        const seam = Math.abs(Math.sin(segmentPhase * Math.PI));
+        const shade = seam < 0.22 ? 0.56 : lerp(0.86, 1.08, seam);
+        return jitterColor(188 * shade, 154 * shade, 112 * shade, x, y, z, 0.07);
+      }
+
+      function colorObsidian(x, y, z, tipFactor = 0.0) {
+        return jitterColor(
+          lerp(26, 68, tipFactor),
+          lerp(24, 62, tipFactor),
+          lerp(31, 72, tipFactor),
+          x, y, z, 0.10
+        );
+      }
+
+      function colorFang(x, y, z, tipFactor = 0.5) {
+        return jitterColor(
+          lerp(196, 242, tipFactor),
+          lerp(182, 232, tipFactor),
+          lerp(155, 206, tipFactor),
+          x, y, z, 0.05
+        );
+      }
+
+      function colorMembrane(x, y, z, translucency = 0.5) {
+        const vein = fbm3D(x * 0.14, y * 0.14, z * 0.14, 2);
+        const t = clamp(translucency * 0.8 + (vein - 0.4) * 0.35, 0, 1);
+        return jitterColor(lerp(36, 108, t), lerp(11, 24, t), lerp(16, 22, t), x, y, z, 0.10);
+      }
+
+      // =========================================================================
+      // 4. 数学体素雕刻基础图元 (椭球采样、曲线管道、尖刺锥体)
+      // =========================================================================
+      const _worldUp = new THREE.Vector3(0, 1, 0);
+
+      function buildStableFrame(tangent) {
+        const right = new THREE.Vector3().crossVectors(_worldUp, tangent);
+        if (right.lengthSq() < 1e-6) right.set(1, 0, 0);
+        else right.normalize();
+        const up = new THREE.Vector3().crossVectors(tangent, right).normalize();
+        return { right, up };
+      }
+
+      function stampEllipsoid(grid, cx, cy, cz, rx, ry, rz, mat, prio, colorFn) {
+        const minX = Math.floor(cx - rx), maxX = Math.ceil(cx + rx);
+        const minY = Math.floor(cy - ry), maxY = Math.ceil(cy + ry);
+        const minZ = Math.floor(cz - rz), maxZ = Math.ceil(cz + rz);
+        const irx = 1 / Math.max(rx, 0.01);
+        const iry = 1 / Math.max(ry, 0.01);
+        const irz = 1 / Math.max(rz, 0.01);
+
+        for (let x = minX; x <= maxX; x++) {
+          const dx = (x - cx) * irx;
+          const dx2 = dx * dx;
+          if (dx2 > 1.0) continue;
+          for (let y = minY; y <= maxY; y++) {
+            const dy = (y - cy) * iry;
+            const dxy2 = dx2 + dy * dy;
+            if (dxy2 > 1.0) continue;
+            for (let z = minZ; z <= maxZ; z++) {
+              const dz = (z - cz) * irz;
+              if (dxy2 + dz * dz <= 1.0) {
+                const [r, g, b] = colorFn(x, y, z, dx, dy, dz);
+                grid.set(x, y, z, r, g, b, mat, prio);
+              }
+            }
+          }
+        }
+      }
+
+      function stampCurveTube(grid, curve, steps, radiusFn, mat, prio, colorFn) {
+        for (let i = 0; i <= steps; i++) {
+          const u = i / steps;
+          const p = safePointAt(curve, u);
+          const rad = radiusFn(u);
+          const rx = typeof rad === 'number' ? rad : rad[0];
+          const ry = typeof rad === 'number' ? rad : rad[1];
+          const rz = typeof rad === 'number' ? rad : (rad[2] ?? rx);
+          stampEllipsoid(grid, p.x, p.y, p.z, rx, ry, rz, mat, prio,
+            (x, y, z, dx, dy, dz) => colorFn(x, y, z, u, dx, dy, dz)
+          );
+        }
+      }
+
+      function stampCurvedSpike(grid, base, dir, bendVec, length, baseRadius, tipRadius, mat, prio, colorFn) {
+        const steps = Math.max(8, Math.ceil(length * 2.4));
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          const px = base.x + dir.x * length * t + bendVec.x * t * t;
+          const py = base.y + dir.y * length * t + bendVec.y * t * t;
+          const pz = base.z + dir.z * length * t + bendVec.z * t * t;
+          const rad = lerp(baseRadius, tipRadius, Math.pow(t, 0.85));
+          stampEllipsoid(grid, px, py, pz, rad, rad, rad, mat, prio,
+            (x, y, z) => colorFn(x, y, z, t)
+          );
+        }
+      }
+
+      // =========================================================================
+      // 5. 西方龙解剖构建：躯干、脊柱、背棘、腹甲与矛尖长尾
+      // =========================================================================
+      function buildSpineAndTorso(grid) {
+        const spinePoints = [
+          new THREE.Vector3(17, 21, -78),   // 0. 尾尖
+          new THREE.Vector3(4, 3, -64),     // 1. 尾弧下沉
+          new THREE.Vector3(-15, -5, -46),  // 2. 尾中段向左摆动
+          new THREE.Vector3(-6, -5, -30),   // 3. 尾根回正
+          new THREE.Vector3(0, -1, -18),    // 4. 骨盆/腰臀
+          new THREE.Vector3(0, 4, -5),      // 5. 收紧腹部
+          new THREE.Vector3(0, 13, 12),     // 6. 饱满胸腔
+          new THREE.Vector3(0, 23, 23),     // 7. 强壮颈根
+          new THREE.Vector3(0, 33, 31),     // 8. 拱起颈背
+          new THREE.Vector3(0, 33, 39),     // 9. 上颈前探
+          new THREE.Vector3(0, 29, 43),     // 10. 颅底连接点
+        ];
+        const spine = new THREE.CatmullRomCurve3(spinePoints, false, 'catmullrom', 0.5);
+
+        const rxKeys = [
+          [0.00, 1.1], [0.16, 2.1], [0.34, 3.6], [0.46, 5.4],
+          [0.53, 7.2], [0.61, 5.9], [0.72, 10.2], [0.81, 6.2],
+          [0.90, 4.7], [1.00, 4.3]
+        ];
+        const ryKeys = [
+          [0.00, 1.3], [0.16, 2.4], [0.34, 4.1], [0.46, 5.8],
+          [0.53, 7.0], [0.61, 6.3], [0.72, 11.8], [0.81, 6.8],
+          [0.90, 5.2], [1.00, 4.5]
+        ];
+
+        const steps = Math.ceil(spine.getLength() * 2.2);
+
+        // 1) 主体躯干、颈部、长尾与横向分节腹甲
+        for (let i = 0; i <= steps; i++) {
+          const u = i / steps;
+          const p = safePointAt(spine, u);
+          const tangent = safeTangentAt(spine, u).normalize();
+          const { right, up } = buildStableFrame(tangent);
+
+          const rx = samplePiecewise(rxKeys, u);
+          const ry = samplePiecewise(ryKeys, u);
+          const maxR = Math.ceil(Math.max(rx, ry)) + 1;
+          const maxR2 = maxR * maxR;
+
+          const minX = Math.floor(p.x - maxR), maxX = Math.ceil(p.x + maxR);
+          const minY = Math.floor(p.y - maxR), maxY = Math.ceil(p.y + maxR);
+          const minZ = Math.floor(p.z - maxR), maxZ = Math.ceil(p.z + maxR);
+
+          for (let x = minX; x <= maxX; x++) {
+            const ox = x - p.x;
+            for (let y = minY; y <= maxY; y++) {
+              const oy = y - p.y;
+              const oxy2 = ox * ox + oy * oy;
+              if (oxy2 > maxR2) continue;
+              for (let z = minZ; z <= maxZ; z++) {
+                const oz = z - p.z;
+                if (oxy2 + oz * oz > maxR2) continue;
+
+                const lr = ox * right.x + oy * right.y + oz * right.z;
+                const lu = ox * up.x + oy * up.y + oz * up.z;
+                const lf = ox * tangent.x + oy * tangent.y + oz * tangent.z;
+
+                const widthMod = lu > 0 ? lerp(1.0, 0.84, clamp(lu / ry, 0, 1)) : 1.0;
+                const nr = lr / (rx * widthMod);
+                const nu = lu / ry;
+                const nf = lf / 2.2;
+                if (nr * nr + nu * nu + nf * nf > 1.0) continue;
+
+                const isBelly = u > 0.26 && nu < -0.46 && Math.abs(nr) < 0.72;
+                if (isBelly) {
+                  const [r, g, b] = colorBelly(x, y, z, u * 48.0);
+                  grid.set(x, y, z, r, g, b, MAT.BELLY, PRIO.BELLY);
+                } else {
+                  const dorsal = clamp((nu + 0.55) / 1.45, 0, 1);
+                  const [r, g, b] = colorScale(x, y, z, dorsal);
+                  grid.set(x, y, z, r, g, b, MAT.SCALES, PRIO.SCALES);
+                }
+              }
+            }
+          }
+        }
+
+        // 2) 沿整个颈背、脊柱至尾尖的锯齿状黑曜石背棘
+        const spineCount = 34;
+        for (let i = 1; i < spineCount; i++) {
+          const u = lerp(0.06, 0.97, i / spineCount);
+          const p = safePointAt(spine, u);
+          const tangent = safeTangentAt(spine, u).normalize();
+          const { up } = buildStableFrame(tangent);
+          const ry = samplePiecewise(ryKeys, u);
+
+          let height = 3.2;
+          if (u > 0.65 && u < 0.92) {
+            height = lerp(4.8, 7.6, Math.sin(((u - 0.65) / 0.27) * Math.PI));
+          } else if (u >= 0.92) {
+            height = lerp(5.2, 3.6, (u - 0.92) / 0.08);
+          } else {
+            height = lerp(2.0, 5.2, u / 0.65);
+          }
+
+          const base = p.clone().addScaledVector(up, ry * 0.82);
+          const dir = up.clone().multiplyScalar(0.86).addScaledVector(tangent, -0.52).normalize();
+          const bend = tangent.clone().multiplyScalar(-height * 0.32);
+          const baseRad = clamp(height * 0.22, 0.85, 1.55);
+
+          stampCurvedSpike(grid, base, dir, bend, height, baseRad, 0.45, MAT.BONE, PRIO.HORN_SPINE,
+            (x, y, z, t) => colorObsidian(x, y, z, t * 0.7)
+          );
+        }
+
+        // 3) 尾尖矛状尾刃 (Spearhead Tail Blade)
+        const tailTip = safePointAt(spine, 0.0);
+        const tailBackDir = safeTangentAt(spine, 0.02).normalize().multiplyScalar(-1);
+        const { right: bladeSide, up: bladeUp } = buildStableFrame(tailBackDir);
+
+        const bladeLen = 14;
+        for (let s = -2; s <= bladeLen; s += 0.45) {
+          const t = (s + 2) / (bladeLen + 2);
+          const halfW = t < 0.34
+            ? lerp(1.0, 5.4, Math.pow(t / 0.34, 0.75))
+            : lerp(5.4, 0.3, Math.pow((t - 0.34) / 0.66, 1.15));
+          const halfH = lerp(1.4, 0.4, t);
+
+          for (let w = -halfW; w <= halfW; w += 0.5) {
+            const edgeRatio = Math.abs(w) / Math.max(halfW, 0.1);
+            const localH = halfH * (1 - edgeRatio * 0.72);
+            for (let h = -localH; h <= localH; h += 0.5) {
+              const px = tailTip.x + tailBackDir.x * s + bladeSide.x * w + bladeUp.x * h;
+              const py = tailTip.y + tailBackDir.y * s + bladeSide.y * w + bladeUp.y * h;
+              const pz = tailTip.z + tailBackDir.z * s + bladeSide.z * w + bladeUp.z * h;
+              const [r, g, b] = colorObsidian(px, py, pz, edgeRatio > 0.65 ? 0.85 : 0.25);
+              grid.set(px, py, pz, r, g, b, MAT.BONE, PRIO.HORN_SPINE);
+            }
+          }
+        }
+
+        return spine;
+      }
+
+      // =========================================================================
+      // 6. 龙头精细雕刻：吻部、深陷发光眼窝、双角、颊刺、咆哮大张下颌与獠牙
+      // =========================================================================
+      function buildHead(grid) {
+        const origin = new THREE.Vector3(0, 29, 43);
+        const fwd = new THREE.Vector3(0, -0.34, 0.94).normalize();
+        const right = new THREE.Vector3(1, 0, 0);
+        const up = new THREE.Vector3().crossVectors(fwd, right).normalize();
+
+        const toWorld = (lx, ly, lz) => new THREE.Vector3(
+          origin.x + right.x * lx + up.x * ly + fwd.x * lz,
+          origin.y + right.y * lx + up.y * ly + fwd.y * lz,
+          origin.z + right.z * lx + up.z * ly + fwd.z * lz
+        );
+
+        // 1) 颅骨与上吻部轮廓
+        for (let lz = -4; lz <= 20; lz += 0.5) {
+          let halfW, topH, botH;
+          if (lz < 5) {
+            const k = (lz + 4) / 9;
+            halfW = lerp(4.6, 5.4, Math.sin(k * Math.PI * 0.8));
+            topH = lerp(4.2, 5.1, k);
+            botH = -2.4;
+          } else {
+            const k = (lz - 5) / 15;
+            halfW = lerp(4.7, 2.3, Math.pow(k, 0.85));
+            topH = lerp(4.4, 2.3, k) + (lz > 14 && lz < 18 ? 0.65 : 0);
+            botH = lerp(-1.2, -0.5, k);
+          }
+
+          for (let lx = -Math.ceil(halfW); lx <= Math.ceil(halfW); lx += 0.6) {
+            for (let ly = Math.floor(botH); ly <= Math.ceil(topH); ly += 0.6) {
+              const nx = lx / halfW;
+              const ny = (ly - (topH + botH) * 0.5) / ((topH - botH) * 0.5);
+              if (nx * nx + ny * ny > 1.0) continue;
+
+              // 深陷眼窝
+              if (Math.abs(lx) > 3.1 && ly > 0.4 && ly < 2.9 && lz > 4.2 && lz < 8.4) continue;
+              // 鼻孔凹槽
+              if (Math.abs(Math.abs(lx) - 1.7) < 0.7 && ly > 1.2 && lz > 16.2 && lz < 18.0) continue;
+              // 上颚口腔内凹
+              if (lz > 5 && lz < 17 && ly < botH + 0.9 && Math.abs(lx) < halfW * 0.62) continue;
+
+              const wp = toWorld(lx, ly, lz);
+              const dorsal = clamp((ny + 0.6) / 1.5, 0, 1);
+              const [r, g, b] = colorScale(wp.x, wp.y, wp.z, dorsal);
+              grid.set(wp.x, wp.y, wp.z, r, g, b, MAT.SCALES, PRIO.SCALES);
+            }
+          }
+        }
+
+        // 鼻梁骨棘
+        {
+          const nBase = toWorld(0, 2.8, 16.5);
+          const nDir = up.clone().multiplyScalar(0.8).addScaledVector(fwd, -0.45).normalize();
+          stampCurvedSpike(grid, nBase, nDir, fwd.clone().multiplyScalar(-0.8), 2.8, 1.0, 0.4,
+            MAT.BONE, PRIO.HORN_SPINE, (x, y, z, t) => colorObsidian(x, y, z, t * 0.6));
+        }
+
+        // 2) 眉骨、高亮发光眼珠、主副双角与颊刺
+        for (const side of [-1, 1]) {
+          const browCurve = new THREE.CatmullRomCurve3([
+            toWorld(side * 3.2, 3.2, 10.5),
+            toWorld(side * 4.9, 3.9, 6.2),
+            toWorld(side * 4.7, 3.7, 1.5),
+          ]);
+          stampCurveTube(grid, browCurve, 22, (u) => lerp(1.0, 1.55, Math.sin(u * Math.PI)),
+            MAT.SCALES, PRIO.WING_BONE, (x, y, z) => colorScale(x, y, z, 0.85));
+
+          const sockCenter = toWorld(side * 3.7, 1.6, 6.2);
+          stampEllipsoid(grid, sockCenter.x, sockCenter.y, sockCenter.z, 1.2, 1.3, 1.6,
+            MAT.BONE, PRIO.WING_BONE, () => [16, 10, 12]);
+
+          // 高亮发光体素眼珠
+          for (let dz = -0.6; dz <= 0.8; dz += 0.65) {
+            for (let dy = -0.4; dy <= 0.5; dy += 0.65) {
+              const ep = toWorld(side * 4.35, 1.65 + dy, 6.3 + dz);
+              const isCore = Math.abs(dz) < 0.35 && Math.abs(dy) < 0.35;
+              const [r, g, b] = isCore ? [255, 250, 150] : [255, 145, 20];
+              grid.set(ep.x, ep.y, ep.z, r, g, b, MAT.FIRE_CORE, PRIO.FANG_EYE);
+            }
+          }
+
+          // 向后上方弯曲的粗壮双主角
+          const mainHorn = new THREE.CatmullRomCurve3([
+            toWorld(side * 3.4, 4.1, 1.5),
+            toWorld(side * 6.4, 6.8, -5.0),
+            toWorld(side * 10.2, 11.4, -12.5),
+            toWorld(side * 12.8, 17.5, -18.5),
+          ]);
+          stampCurveTube(grid, mainHorn, 48, (u) => {
+            const baseR = lerp(2.2, 0.55, Math.pow(u, 0.82));
+            return baseR * (1.0 + 0.12 * Math.sin(u * 26.0));
+          }, MAT.BONE, PRIO.HORN_SPINE, (x, y, z, u) => colorObsidian(x, y, z, u * 0.78));
+
+          // 次级后角
+          const subHorn = new THREE.CatmullRomCurve3([
+            toWorld(side * 4.8, 0.5, 1.0),
+            toWorld(side * 8.2, 1.0, -4.8),
+            toWorld(side * 11.4, 3.0, -9.8),
+          ]);
+          stampCurveTube(grid, subHorn, 26, (u) => lerp(1.35, 0.45, u),
+            MAT.BONE, PRIO.HORN_SPINE, (x, y, z, u) => colorObsidian(x, y, z, u * 0.65));
+
+          // 颊部骨刺
+          for (let k = 0; k < 2; k++) {
+            const cBase = toWorld(side * 4.8, -0.8 - k * 0.9, 3.5 - k * 2.2);
+            const cDir = right.clone().multiplyScalar(side * 0.65)
+              .addScaledVector(fwd, -0.68).addScaledVector(up, -0.22).normalize();
+            stampCurvedSpike(grid, cBase, cDir, up.clone().multiplyScalar(0.6), 3.6 - k * 0.5,
+              1.05, 0.4, MAT.BONE, PRIO.HORN_SPINE, (x, y, z, t) => colorObsidian(x, y, z, t * 0.7));
+          }
+        }
+
+        // 3) 大张咆哮的下颌
+        const jawHinge = toWorld(0, -1.8, 2.2);
+        const jawAngle = 0.74;
+        const jawFwd = fwd.clone().multiplyScalar(Math.cos(jawAngle))
+          .addScaledVector(up, -Math.sin(jawAngle)).normalize();
+        const jawUp = up.clone().multiplyScalar(Math.cos(jawAngle))
+          .addScaledVector(fwd, Math.sin(jawAngle)).normalize();
+
+        const jawToWorld = (lx, ly, lz) => new THREE.Vector3(
+          jawHinge.x + right.x * lx + jawUp.x * ly + jawFwd.x * lz,
+          jawHinge.y + right.y * lx + jawUp.y * ly + jawFwd.y * lz,
+          jawHinge.z + right.z * lx + jawUp.z * ly + jawFwd.z * lz
+        );
+
+        for (let lz = 0; lz <= 17.5; lz += 0.5) {
+          const k = lz / 17.5;
+          const halfW = lerp(4.4, 2.0, Math.pow(k, 0.85));
+          const thickH = lerp(2.6, 1.5, k);
+          for (let lx = -Math.ceil(halfW); lx <= Math.ceil(halfW); lx += 0.55) {
+            for (let ly = -Math.ceil(thickH); ly <= 0.8; ly += 0.55) {
+              const nx = lx / halfW;
+              const ny = (ly + thickH * 0.45) / (thickH * 0.75);
+              if (nx * nx + ny * ny > 1.0) continue;
+              if (lz > 2.5 && lz < 14.5 && ly > -thickH * 0.35 && Math.abs(lx) < halfW * 0.58) continue;
+
+              const wp = jawToWorld(lx, ly, lz);
+              const isChinPlate = ly < -thickH * 0.55 && Math.abs(lx) < halfW * 0.65;
+              if (isChinPlate) {
+                const [r, g, b] = colorBelly(wp.x, wp.y, wp.z, k * 8.0);
+                grid.set(wp.x, wp.y, wp.z, r, g, b, MAT.BELLY, PRIO.BELLY);
+              } else {
+                const [r, g, b] = colorScale(wp.x, wp.y, wp.z, 0.38);
+                grid.set(wp.x, wp.y, wp.z, r, g, b, MAT.SCALES, PRIO.SCALES);
+              }
+            }
+          }
+        }
+
+        // 下巴尖端倒刺
+        for (const side of [-1, 0, 1]) {
+          const spBase = jawToWorld(side * 1.4, -1.6, 13.5 - Math.abs(side) * 2.5);
+          const spDir = jawUp.clone().multiplyScalar(-0.72).addScaledVector(jawFwd, -0.58).normalize();
+          stampCurvedSpike(grid, spBase, spDir, jawFwd.clone().multiplyScalar(-0.7),
+            side === 0 ? 3.2 : 2.5, 0.9, 0.35, MAT.BONE, PRIO.HORN_SPINE,
+            (x, y, z, t) => colorObsidian(x, y, z, t * 0.6));
+        }
+
+        // 4) 上下颌尖锐白色獠牙
+        for (const side of [-1, 1]) {
+          const uFangPos = toWorld(side * 2.1, -0.8, 16.2);
+          const uFangDir = up.clone().multiplyScalar(-0.95).addScaledVector(fwd, 0.25).normalize();
+          stampCurvedSpike(grid, uFangPos, uFangDir, fwd.clone().multiplyScalar(-0.4),
+            3.4, 0.72, 0.32, MAT.BONE, PRIO.FANG_EYE, (x, y, z, t) => colorFang(x, y, z, t));
+
+          for (let tIdx = 0; tIdx < 4; tIdx++) {
+            const zPos = 13.2 - tIdx * 2.2;
+            const xPos = side * lerp(2.6, 3.7, tIdx / 3);
+            const tp = toWorld(xPos, -1.0, zPos);
+            stampCurvedSpike(grid, tp, up.clone().multiplyScalar(-1), new THREE.Vector3(),
+              2.0 - tIdx * 0.15, 0.52, 0.3, MAT.BONE, PRIO.FANG_EYE, (x, y, z, t) => colorFang(x, y, z, t));
+          }
+
+          const lFangPos = jawToWorld(side * 1.65, 0.2, 15.2);
+          const lFangDir = jawUp.clone().multiplyScalar(0.95).addScaledVector(jawFwd, 0.2).normalize();
+          stampCurvedSpike(grid, lFangPos, lFangDir, jawFwd.clone().multiplyScalar(-0.3),
+            2.9, 0.65, 0.32, MAT.BONE, PRIO.FANG_EYE, (x, y, z, t) => colorFang(x, y, z, t));
+
+          for (let tIdx = 0; tIdx < 3; tIdx++) {
+            const zPos = 12.2 - tIdx * 2.4;
+            const xPos = side * lerp(2.2, 3.2, tIdx / 2);
+            const tp = jawToWorld(xPos, 0.1, zPos);
+            stampCurvedSpike(grid, tp, jawUp, new THREE.Vector3(),
+              1.8, 0.48, 0.28, MAT.BONE, PRIO.FANG_EYE, (x, y, z, t) => colorFang(x, y, z, t));
+          }
+        }
+
+        // 5) 喉部炽热熔岩内核
+        const throatCore = toWorld(0, -1.9, 6.0);
+        stampEllipsoid(grid, throatCore.x, throatCore.y, throatCore.z, 2.3, 2.1, 3.6,
+          MAT.FIRE_CORE, PRIO.FIRE_CORE, (x, y, z) => jitterColor(255, 248, 185, x, y, z, 0.04));
+
+        const fireOrigin = toWorld(0, -2.2, 8.2);
+        const fireDir = fwd.clone().multiplyScalar(0.96).addScaledVector(up, -0.26).normalize();
+        return { fireOrigin, fireDir };
+      }
+
+      // =========================================================================
+      // 7. 巨型蝠翼解剖生成：粗壮翼臂 + 5根放射弯曲翼指骨 + 曲面锯齿翼膜
+      // =========================================================================
+      function buildWings(grid) {
+        for (const side of [-1, 1]) {
+          const S = (x, y, z) => new THREE.Vector3(side * x, y, z);
+
+          // 1) 翼臂骨：肩 -> 肘 -> 腕
+          const shoulder = S(7.5, 16.5, 11.5);
+          const elbow    = S(25.0, 25.5, 1.5);
+          const wrist    = S(46.0, 47.0, 15.0);
+
+          const armCurve = new THREE.CatmullRomCurve3([
+            shoulder,
+            S(16.5, 22.0, 6.5),
+            elbow,
+            S(36.0, 38.0, 8.5),
+            wrist,
+          ]);
+          stampCurveTube(grid, armCurve, 75, (u) => {
+            const base = lerp(4.4, 2.5, u);
+            const elbowBump = Math.exp(-Math.pow((u - 0.44) * 10, 2)) * 0.9;
+            const wristBump = Math.exp(-Math.pow((u - 1.0) * 12, 2)) * 1.1;
+            return base + elbowBump + wristBump;
+          }, MAT.SCALES, PRIO.WING_BONE, (x, y, z, u) => colorScale(x, y, z, 0.72 + u * 0.15));
+
+          // 翼腕钩爪 (Alula)
+          const thumbCurve = new THREE.CatmullRomCurve3([
+            wrist,
+            S(45.5, 52.5, 20.5),
+            S(43.5, 55.5, 25.8),
+          ]);
+          stampCurveTube(grid, thumbCurve, 24, (u) => lerp(1.8, 0.45, u),
+            MAT.BONE, PRIO.HORN_SPINE, (x, y, z, u) => colorObsidian(x, y, z, u * 0.8));
+
+          // 2) 5 根放射状细长弯曲翼指骨
+          const fingers = [
+            new THREE.CatmullRomCurve3([wrist, S(67, 49, 19), S(85, 40, 14), S(94, 24, 5)]),
+            new THREE.CatmullRomCurve3([wrist, S(66, 36, 5), S(80, 17, -6), S(83, -3, -17)]),
+            new THREE.CatmullRomCurve3([wrist, S(58, 28, -2), S(64, 7, -16), S(61, -13, -27)]),
+            new THREE.CatmullRomCurve3([wrist, S(47, 23, -6), S(45, 3, -20), S(39, -15, -28)]),
+            new THREE.CatmullRomCurve3([wrist, S(36, 22, -4), S(28, 5, -16), S(22, -9, -22)]),
+          ];
+
+          fingers.forEach((curve, idx) => {
+            const rStart = idx === 0 ? 2.2 : lerp(1.75, 1.35, idx / 4);
+            const rEnd   = idx === 0 ? 0.65 : 0.45;
+            stampCurveTube(grid, curve, 70, (u) => lerp(rStart, rEnd, Math.pow(u, 0.75)),
+              MAT.BONE, PRIO.WING_BONE, (x, y, z, u) => colorObsidian(x, y, z, 0.15 + u * 0.55));
+          });
+
+          // 3) 指骨间弯曲翼膜 (Panel 1 ~ 4)：严格限制 t ∈ [0, 1]，杜绝越界！
+          const camberDir = new THREE.Vector3(side * 0.12, 0.82, 0.56).normalize();
+          const scallopDepths = [0.20, 0.23, 0.24, 0.21];
+
+          for (let f = 0; f < 4; f++) {
+            const cA = fingers[f];
+            const cB = fingers[f + 1];
+            const scallop = scallopDepths[f];
+            const sSteps = 62;
+            const tSteps = 96;
+
+            for (let si = 0; si <= sSteps; si++) {
+              const s = si / sSteps;
+              const arcScallop = 4.0 * s * (1.0 - s);
+              const ragged = (valueNoise3D(s * 14 + f * 7, side * 3, 1.5) - 0.5) * 0.04;
+              // 修复：将锯齿噪声乘以 arcScallop 并严格 clamp 到 [0.05, 1.0]
+              const tMax = clamp(1.0 - scallop * arcScallop + ragged * arcScallop, 0.05, 1.0);
+
+              for (let ti = 1; ti <= tSteps; ti++) {
+                const tFrac = ti / tSteps;
+                const t = clamp(tFrac * tMax, 0.0, 1.0);
+                const pA = safePointAt(cA, t);
+                const pB = safePointAt(cB, t);
+
+                const billow = Math.sin(Math.PI * s) * Math.sin(Math.PI * tFrac) * (4.4 - f * 0.35);
+                const droop  = Math.pow(tFrac, 2.5) * Math.sin(Math.PI * s) * -2.2;
+
+                const px = lerp(pA.x, pB.x, s) + camberDir.x * billow;
+                const py = lerp(pA.y, pB.y, s) + camberDir.y * billow + droop;
+                const pz = lerp(pA.z, pB.z, s) + camberDir.z * billow;
+
+                const translu = Math.sin(Math.PI * s) * Math.sin(Math.PI * t * 0.9);
+                const [r, g, b] = colorMembrane(px, py, pz, translu);
+                grid.set(px, py, pz, r, g, b, MAT.MEMBRANE, PRIO.MEMBRANE);
+
+                if (t < 0.55 || (ti % 2 === 0)) {
+                  grid.set(px + camberDir.x * 0.8, py + camberDir.y * 0.8, pz + camberDir.z * 0.8,
+                    r * 0.92, g * 0.92, b * 0.92, MAT.MEMBRANE, PRIO.MEMBRANE);
+                }
+              }
+            }
+          }
+
+          // 4) 内翼膜 (Coons 曲面片无缝衔接肩-肘-腕、第5指骨与腰臀)
+          const flankCurve = new THREE.CatmullRomCurve3([
+            shoulder,
+            S(8.5, 10.0, 0.5),
+            S(6.8, 3.0, -9.5),
+            S(6.0, -1.0, -18.0),
+          ]);
+          const hip = safePointAt(flankCurve, 1.0);
+          const f5Tip = safePointAt(fingers[4], 1.0);
+          const innerTrailCurve = new THREE.CatmullRomCurve3([
+            hip,
+            S(14.0, -1.5, -17.0),
+            f5Tip,
+          ]);
+
+          const uSteps = 72, vSteps = 68;
+          for (let ui = 0; ui <= uSteps; ui++) {
+            const u = ui / uSteps;
+            const topP = safePointAt(armCurve, u);
+            const botP = safePointAt(innerTrailCurve, u);
+
+            for (let vi = 0; vi <= vSteps; vi++) {
+              const v = vi / vSteps;
+              const leftP  = safePointAt(flankCurve, v);
+              const rightP = safePointAt(fingers[4], v);
+
+              const cx = (1 - v) * topP.x + v * botP.x + (1 - u) * leftP.x + u * rightP.x
+                - ((1 - u) * (1 - v) * shoulder.x + u * (1 - v) * wrist.x + (1 - u) * v * hip.x + u * v * f5Tip.x);
+              const cy = (1 - v) * topP.y + v * botP.y + (1 - u) * leftP.y + u * rightP.y
+                - ((1 - u) * (1 - v) * shoulder.y + u * (1 - v) * wrist.y + (1 - u) * v * hip.y + u * v * f5Tip.y);
+              const cz = (1 - v) * topP.z + v * botP.z + (1 - u) * leftP.z + u * rightP.z
+                - ((1 - u) * (1 - v) * shoulder.z + u * (1 - v) * wrist.z + (1 - u) * v * hip.z + u * v * f5Tip.z);
+
+              const dome = Math.sin(Math.PI * u) * Math.sin(Math.PI * v) * 3.8;
+              const px = cx + camberDir.x * dome;
+              const py = cy + camberDir.y * dome;
+              const pz = cz + camberDir.z * dome;
+
+              const translu = Math.sin(Math.PI * u) * Math.sin(Math.PI * v) * 0.9;
+              const [r, g, b] = colorMembrane(px, py, pz, translu);
+              grid.set(px, py, pz, r, g, b, MAT.MEMBRANE, PRIO.MEMBRANE);
+              grid.set(px + camberDir.x * 0.85, py + camberDir.y * 0.85, pz + camberDir.z * 0.85,
+                r * 0.9, g * 0.9, b * 0.9, MAT.MEMBRANE, PRIO.MEMBRANE);
+            }
+          }
+
+          // 5) 前翼膜 (Propatagium)
+          const proEdge = new THREE.CatmullRomCurve3([
+            shoulder,
+            S(28.0, 32.5, 14.5),
+            wrist,
+          ]);
+          for (let ui = 0; ui <= 48; ui++) {
+            const u = ui / 48;
+            const pArm = safePointAt(armCurve, u);
+            const pFront = safePointAt(proEdge, u);
+            for (let vi = 0; vi <= 14; vi++) {
+              const v = vi / 14;
+              const px = lerp(pArm.x, pFront.x, v);
+              const py = lerp(pArm.y, pFront.y, v);
+              const pz = lerp(pArm.z, pFront.z, v);
+              const [r, g, b] = colorMembrane(px, py, pz, 0.25);
+              grid.set(px, py, pz, r, g, b, MAT.MEMBRANE, PRIO.MEMBRANE);
+            }
+          }
+        }
+      }
+
+      // =========================================================================
+      // 8. 肌肉分明的四肢与蓄力锐利龙爪
+      // =========================================================================
+      function buildFootClaws(grid, anklePos, side, isHind) {
+        const toeAngles = isHind ? [-0.42, 0.0, 0.42] : [-0.46, 0.0, 0.46];
+        const baseFwd = isHind
+          ? new THREE.Vector3(side * 0.12, -0.58, 0.80).normalize()
+          : new THREE.Vector3(side * 0.14, -0.45, 0.88).normalize();
+
+        stampEllipsoid(grid, anklePos.x, anklePos.y - 0.8, anklePos.z + 1.2, 2.3, 1.8, 2.5,
+          MAT.SCALES, PRIO.WING_BONE, (x, y, z) => colorScale(x, y, z, 0.55));
+
+        toeAngles.forEach((ang, idx) => {
+          const len = idx === 1 ? (isHind ? 6.2 : 5.6) : (isHind ? 5.2 : 4.8);
+          const dir = new THREE.Vector3(
+            baseFwd.x * Math.cos(ang) + baseFwd.z * Math.sin(ang),
+            baseFwd.y,
+            -baseFwd.x * Math.sin(ang) + baseFwd.z * Math.cos(ang)
+          ).normalize();
+
+          const knuckle = anklePos.clone().addScaledVector(dir, len * 0.55);
+          knuckle.y -= 0.6;
+          const toeEnd = anklePos.clone().addScaledVector(dir, len);
+          toeEnd.y -= 2.2;
+
+          const toeCurve = new THREE.CatmullRomCurve3([anklePos, knuckle, toeEnd]);
+          stampCurveTube(grid, toeCurve, 18, (u) => lerp(1.25, 0.8, u),
+            MAT.SCALES, PRIO.WING_BONE, (x, y, z) => colorScale(x, y, z, 0.65));
+
+          const clawDir = dir.clone().multiplyScalar(0.75).add(new THREE.Vector3(0, -0.85, 0)).normalize();
+          const clawBend = new THREE.Vector3(0, -2.0, -1.6);
+          stampCurvedSpike(grid, toeEnd, clawDir, clawBend, isHind ? 4.4 : 3.9, 0.85, 0.35,
+            MAT.BONE, PRIO.HORN_SPINE, (x, y, z, t) => colorObsidian(x, y, z, t * 0.85));
+        });
+
+        const backDir = new THREE.Vector3(side * -0.15, -0.65, -0.75).normalize();
+        const dewBase = anklePos.clone().add(new THREE.Vector3(0, 0.2, -1.5));
+        stampCurvedSpike(grid, dewBase, backDir, new THREE.Vector3(0, -1.4, 0.8), 3.4, 0.85, 0.35,
+          MAT.BONE, PRIO.HORN_SPINE, (x, y, z, t) => colorObsidian(x, y, z, t * 0.8));
+      }
+
+      function buildLimbs(grid) {
+        for (const side of [-1, 1]) {
+          const S = (x, y, z) => new THREE.Vector3(side * x, y, z);
+
+          // 前肢
+          const fShoulder = S(8.5, 7.5, 13.5);
+          const fElbow    = S(14.5, -1.5, 6.5);
+          const fWrist    = S(12.2, -10.5, 17.5);
+
+          const foreUpper = new THREE.CatmullRomCurve3([fShoulder, S(12.2, 3.2, 10.0), fElbow]);
+          stampCurveTube(grid, foreUpper, 32, (u) => lerp(4.6, 3.1, u) + Math.sin(u * Math.PI) * 0.8,
+            MAT.SCALES, PRIO.SCALES, (x, y, z, u, dx, dy) => colorScale(x, y, z, clamp(0.55 + dy * 0.4, 0, 1)));
+
+          const foreLower = new THREE.CatmullRomCurve3([fElbow, S(13.8, -6.2, 12.2), fWrist]);
+          stampCurveTube(grid, foreLower, 32, (u) => lerp(3.2, 2.1, u),
+            MAT.SCALES, PRIO.SCALES, (x, y, z, u, dx, dy) => colorScale(x, y, z, clamp(0.6 + dy * 0.35, 0, 1)));
+
+          stampCurvedSpike(grid, fElbow, new THREE.Vector3(side * 0.4, 0.2, -0.88).normalize(),
+            new THREE.Vector3(0, 0.8, 0), 3.4, 1.1, 0.4, MAT.BONE, PRIO.HORN_SPINE,
+            (x, y, z, t) => colorObsidian(x, y, z, t * 0.7));
+
+          buildFootClaws(grid, fWrist, side, false);
+
+          // 后肢
+          const hHip   = S(6.5, -0.5, -17.5);
+          const hKnee  = S(14.5, -8.5, -8.5);
+          const hHock  = S(13.2, -19.5, -20.5);
+          const hAnkle = S(11.5, -28.0, -11.5);
+
+          const hindThigh = new THREE.CatmullRomCurve3([hHip, S(11.8, -3.5, -13.0), hKnee]);
+          stampCurveTube(grid, hindThigh, 38, (u) => {
+            const r = lerp(6.2, 3.8, u) + Math.sin(u * Math.PI) * 1.1;
+            return [r * 0.9, r * 1.05, r];
+          }, MAT.SCALES, PRIO.SCALES, (x, y, z, u, dx, dy) => colorScale(x, y, z, clamp(0.5 + dy * 0.45, 0, 1)));
+
+          const hindShin = new THREE.CatmullRomCurve3([hKnee, S(14.2, -14.2, -14.8), hHock]);
+          stampCurveTube(grid, hindShin, 34, (u) => lerp(3.8, 2.4, u),
+            MAT.SCALES, PRIO.SCALES, (x, y, z, u, dx, dy) => colorScale(x, y, z, clamp(0.6 + dy * 0.35, 0, 1)));
+
+          const hindMeta = new THREE.CatmullRomCurve3([hHock, S(12.4, -24.0, -16.0), hAnkle]);
+          stampCurveTube(grid, hindMeta, 28, (u) => lerp(2.4, 2.0, u),
+            MAT.SCALES, PRIO.SCALES, (x, y, z) => colorScale(x, y, z, 0.65));
+
+          stampCurvedSpike(grid, hHock, new THREE.Vector3(side * 0.25, 0.25, -0.92).normalize(),
+            new THREE.Vector3(0, 0.9, 0), 3.2, 1.0, 0.38, MAT.BONE, PRIO.HORN_SPINE,
+            (x, y, z, t) => colorObsidian(x, y, z, t * 0.7));
+
+          buildFootClaws(grid, hAnkle, side, true);
+        }
+      }
+
+      // =========================================================================
+      // 9. 立体体素喷火特效：多层烈焰湍流 + 悬浮火星 + 翻滚黑灰烟雾
+      // =========================================================================
+      function buildFireBreath(grid, fireOrigin, fireDir) {
+        const length = 70;
+        const { right, up } = buildStableFrame(fireDir);
+
+        const endPos = fireOrigin.clone().addScaledVector(fireDir, length);
+        const pad = 26;
+        const minX = Math.floor(Math.min(fireOrigin.x, endPos.x) - pad);
+        const maxX = Math.ceil(Math.max(fireOrigin.x, endPos.x) + pad);
+        const minY = Math.floor(Math.min(fireOrigin.y, endPos.y) - pad);
+        const maxY = Math.ceil(Math.max(fireOrigin.y, endPos.y) + pad + 14);
+        const minZ = Math.floor(Math.min(fireOrigin.z, endPos.z) - 6);
+        const maxZ = Math.ceil(Math.max(fireOrigin.z, endPos.z) + pad);
+
+        for (let x = minX; x <= maxX; x++) {
+          for (let y = minY; y <= maxY; y++) {
+            for (let z = minZ; z <= maxZ; z++) {
+              const ox = x - fireOrigin.x;
+              const oy = y - fireOrigin.y;
+              const oz = z - fireOrigin.z;
+
+              const d = ox * fireDir.x + oy * fireDir.y + oz * fireDir.z;
+              if (d < -1 || d > length + 10) continue;
+
+              const t = clamp(d / length, 0, 1.15);
+              const pr = ox * right.x + oy * right.y + oz * right.z;
+              const pu = ox * up.x + oy * up.y + oz * up.z;
+              const wiggleX = Math.sin(t * 7.5) * 1.4 * t;
+              const wiggleY = Math.cos(t * 5.2) * 1.2 * t;
+              const radialDist = Math.hypot(pr - wiggleX, pu - wiggleY);
+
+              let coneR;
+              if (d < 10) {
+                coneR = lerp(1.7, 3.0, clamp(d / 10, 0, 1));
+              } else {
+                const dt = (d - 10) / (length - 10);
+                coneR = 3.0 + Math.pow(clamp(dt, 0, 1.2), 0.82) * 15.8;
+                if (t > 0.85) coneR *= lerp(1.0, 0.72, (t - 0.85) / 0.3);
+              }
+
+              if (radialDist > coneR * 1.65) continue;
+
+              const turb = fbm3D(
+                (x - fireDir.x * d * 0.35) * 0.11,
+                (y - fireDir.y * d * 0.35) * 0.11,
+                (z - fireDir.z * d * 0.35) * 0.11,
+                3
+              );
+              const fine = valueNoise3D(x * 0.25, y * 0.25, z * 0.25);
+
+              const normR = radialDist / Math.max(coneR, 0.5);
+              const heat = 1.0 - normR - t * 0.34 + (turb - 0.48) * 0.92 + (fine - 0.5) * 0.22;
+
+              if (heat > 0.56 || (d < 12 && normR < 0.85 && heat > 0.32)) {
+                const coreK = clamp((heat - 0.56) / 0.38, 0, 1);
+                const [jr, jg, jb] = jitterColor(255, lerp(225, 255, coreK), lerp(95, 225, coreK), x, y, z, 0.04);
+                grid.set(x, y, z, jr, jg, jb, MAT.FIRE_CORE, PRIO.FIRE_CORE);
+              } else if (heat > 0.34) {
+                const midK = clamp((heat - 0.34) / 0.22, 0, 1);
+                const [jr, jg, jb] = jitterColor(255, lerp(82, 188, midK), lerp(6, 42, midK), x, y, z, 0.08);
+                grid.set(x, y, z, jr, jg, jb, MAT.FIRE_OUTER, PRIO.FIRE_OUTER);
+              } else if (heat > 0.17) {
+                const outK = clamp((heat - 0.17) / 0.17, 0, 1);
+                const [jr, jg, jb] = jitterColor(lerp(130, 232, outK), lerp(12, 54, outK), lerp(6, 10, outK), x, y, z, 0.10);
+                grid.set(x, y, z, jr, jg, jb, MAT.FIRE_OUTER, PRIO.FIRE_OUTER);
+              } else if (t > 0.28) {
+                const smokeLift = (pu + 3.0) * 0.035;
+                const smokeField = heat + smokeLift + (turb - 0.52) * 0.45;
+                if (smokeField > 0.07 && smokeField < 0.20 && hash3(x, y, z) > 0.42) {
+                  const ash = lerp(24, 62, fine);
+                  const warmTint = t < 0.72 ? 12 : 4;
+                  grid.set(x, y + Math.round(t * 5.0), z, ash + warmTint, ash, ash + 2, MAT.SMOKE, PRIO.SMOKE);
+                }
+              }
+            }
+          }
+        }
+
+        // 悬浮火星颗粒体素
+        const sparkCount = 460;
+        for (let i = 0; i < sparkCount; i++) {
+          const s1 = hash3(i * 13, 17, 31);
+          const s2 = hash3(i * 29, 43, 7);
+          const s3 = hash3(i * 53, 11, 89);
+          const s4 = hash3(i * 71, 61, 19);
+
+          const dist = lerp(12, length + 26, Math.pow(s1, 0.78));
+          const angle = s2 * Math.PI * 2;
+          const spread = lerp(4, 29, (dist / (length + 26))) * (0.65 + s3 * 0.85);
+          const liftY = Math.pow(s4, 1.3) * 26 * (dist / length);
+
+          const px = fireOrigin.x + fireDir.x * dist + right.x * Math.cos(angle) * spread + up.x * Math.sin(angle) * spread;
+          const py = fireOrigin.y + fireDir.y * dist + right.y * Math.cos(angle) * spread + up.y * Math.sin(angle) * spread + liftY;
+          const pz = fireOrigin.z + fireDir.z * dist + right.z * Math.cos(angle) * spread + up.z * Math.sin(angle) * spread;
+
+          const hot = s3 > 0.45;
+          const mat = hot ? MAT.FIRE_CORE : MAT.FIRE_OUTER;
+          const [r, g, b] = hot
+            ? [255, lerp(180, 245, s4), lerp(40, 120, s4)]
+            : [255, lerp(65, 130, s4), 10];
+          grid.set(px, py, pz, r, g, b, mat, PRIO.FIRE_CORE);
+        }
+
+        return [
+          fireOrigin.clone().addScaledVector(fireDir, 12),
+          fireOrigin.clone().addScaledVector(fireDir, 30),
+          fireOrigin.clone().addScaledVector(fireDir, 54),
+        ];
+      }
+
+      // =========================================================================
+      // 10. Three.js 场景搭建、InstancedMesh 批量渲染、星空与电影级打光
+      // =========================================================================
+      const container = document.getElementById('canvas-container');
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x040711);
+      scene.fog = new THREE.FogExp2(0x050814, 0.0019);
+
+      const camera = new THREE.PerspectiveCamera(44, window.innerWidth / window.innerHeight, 1, 1400);
+      camera.position.set(112, 46, 134);
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.12;
+      container.appendChild(renderer.domElement);
+
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.06;
+      controls.target.set(0, 14, 22);
+      controls.minDistance = 42;
+      controls.maxDistance = 380;
+      controls.update();
+
+      function buildStarfield() {
+        const starCount = 1350;
+        const positions = new Float32Array(starCount * 3);
+        const colors = new Float32Array(starCount * 3);
+        const c = new THREE.Color();
+
+        for (let i = 0; i < starCount; i++) {
+          const u = hash3(i, 1, 9);
+          const v = hash3(i, 2, 17);
+          const theta = u * Math.PI * 2;
+          const phi = Math.acos(2 * v - 1);
+          const r = lerp(420, 760, hash3(i, 3, 29));
+
+          positions[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
+          positions[i * 3 + 1] = r * Math.cos(phi);
+          positions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+
+          const huePick = hash3(i, 4, 41);
+          const bright = lerp(0.28, 0.85, Math.pow(hash3(i, 5, 53), 1.6));
+          if (huePick < 0.55) c.setRGB(0.75 * bright, 0.84 * bright, 1.0 * bright);
+          else if (huePick < 0.85) c.setRGB(0.95 * bright, 0.94 * bright, 0.92 * bright);
+          else c.setRGB(1.0 * bright, 0.86 * bright, 0.68 * bright);
+
+          colors[i * 3] = c.r;
+          colors[i * 3 + 1] = c.g;
+          colors[i * 3 + 2] = c.b;
+        }
+
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        const mat = new THREE.PointsMaterial({
+          size: 1.5,
+          vertexColors: true,
+          transparent: true,
+          opacity: 0.78,
+          sizeAttenuation: true,
+          fog: false,
+        });
+        scene.add(new THREE.Points(geo, mat));
+      }
+
+      // 执行体素雕刻
+      const t0 = performance.now();
+      const grid = new VoxelGrid();
+
+      buildSpineAndTorso(grid);
+      const { fireOrigin, fireDir } = buildHead(grid);
+      buildWings(grid);
+      buildLimbs(grid);
+      const fireLightPositions = buildFireBreath(grid, fireOrigin, fireDir);
+
+      const rawVoxelCount = grid.map.size;
+      const buckets = grid.extractVisibleBuckets();
+
+      // 严格共享同一个 1x1x1 单位正方体几何体
+      const unitBoxGeo = new THREE.BoxGeometry(1, 1, 1);
+
+      const materialConfigs = [
+        { mat: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.54, metalness: 0.22 }), castShadow: true, receiveShadow: true },
+        { mat: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.44, metalness: 0.14 }), castShadow: true, receiveShadow: true },
+        { mat: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.30, metalness: 0.30 }), castShadow: true, receiveShadow: true },
+        { mat: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.72, metalness: 0.06 }), castShadow: true, receiveShadow: true },
+        { mat: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.96, metalness: 0.0 }),  castShadow: false, receiveShadow: true },
+        { mat: new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }),                  castShadow: false, receiveShadow: false },
+        { mat: new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: true }),                   castShadow: false, receiveShadow: false },
+      ];
+
+      const dummy = new THREE.Object3D();
+      const tmpColor = new THREE.Color();
+      let renderedVoxels = 0;
+
+      buckets.forEach((arr, matIdx) => {
+        const count = arr.length / 6;
+        if (count === 0) return;
+        renderedVoxels += count;
+
+        const cfg = materialConfigs[matIdx];
+        const mesh = new THREE.InstancedMesh(unitBoxGeo, cfg.mat, count);
+        mesh.castShadow = cfg.castShadow;
+        mesh.receiveShadow = cfg.receiveShadow;
+        mesh.frustumCulled = false;
+
+        for (let i = 0; i < count; i++) {
+          const base = i * 6;
+          dummy.position.set(arr[base], arr[base + 1], arr[base + 2]);
+          dummy.updateMatrix();
+          mesh.setMatrixAt(i, dummy.matrix);
+
+          tmpColor.setRGB(
+            arr[base + 3] / 255,
+            arr[base + 4] / 255,
+            arr[base + 5] / 255,
+            THREE.SRGBColorSpace
+          );
+          mesh.setColorAt(i, tmpColor);
+        }
+        mesh.instanceMatrix.needsUpdate = true;
+        if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+        scene.add(mesh);
+      });
+
+      const elapsedMs = Math.round(performance.now() - t0);
+      document.getElementById('stat-voxels').textContent = `渲染体素: ${renderedVoxels.toLocaleString()}`;
+      document.getElementById('stat-raw').textContent = `原始体积: ${rawVoxelCount.toLocaleString()}`;
+      document.getElementById('stat-time').textContent = `生成耗时: ${elapsedMs} ms`;
+
+      buildStarfield();
+
+      // 灯光系统：冷蓝夜空月光 + 3 盏真实火焰轴线暖橙色 PointLight
+      scene.add(new THREE.HemisphereLight(0x2b4578, 0x16090b, 0.72));
+
+      const moonLight = new THREE.DirectionalLight(0x7ca2e8, 2.0);
+      moonLight.position.set(-75, 130, -85);
+      moonLight.castShadow = true;
+      moonLight.shadow.mapSize.set(2048, 2048);
+      moonLight.shadow.camera.left = -125;
+      moonLight.shadow.camera.right = 125;
+      moonLight.shadow.camera.top = 105;
+      moonLight.shadow.camera.bottom = -85;
+      moonLight.shadow.camera.near = 25;
+      moonLight.shadow.camera.far = 360;
+      moonLight.shadow.bias = -0.0004;
+      moonLight.shadow.normalBias = 0.045;
+      scene.add(moonLight);
+
+      const rimLight = new THREE.DirectionalLight(0x3a64a8, 0.75);
+      rimLight.position.set(110, 50, -90);
+      scene.add(rimLight);
+
+      const fireLight1 = new THREE.PointLight(0xffb84d, 210, 120, 1.25);
+      fireLight1.position.copy(fireLightPositions[0]);
+      scene.add(fireLight1);
+
+      const fireLight2 = new THREE.PointLight(0xff5e14, 480, 210, 1.2);
+      fireLight2.position.copy(fireLightPositions[1]);
+      fireLight2.castShadow = true;
+      fireLight2.shadow.mapSize.set(1024, 1024);
+      fireLight2.shadow.bias = -0.0012;
+      fireLight2.shadow.normalBias = 0.05;
+      fireLight2.shadow.camera.near = 2;
+      fireLight2.shadow.camera.far = 200;
+      scene.add(fireLight2);
+
+      const fireLight3 = new THREE.PointLight(0xff3300, 290, 180, 1.25);
+      fireLight3.position.copy(fireLightPositions[2]);
+      scene.add(fireLight3);
+
+      // 静态雕塑：一次性烘焙阴影贴图，交互时满帧流畅
+      renderer.shadowMap.autoUpdate = false;
+      renderer.shadowMap.needsUpdate = true;
+
+      // 相机预设
+      const CAM_PRESETS = {
+        hero:  { pos: new THREE.Vector3(112, 46, 134), target: new THREE.Vector3(0, 14, 22) },
+        head:  { pos: new THREE.Vector3(46, 30, 88),   target: new THREE.Vector3(0, 21, 56) },
+        wings: { pos: new THREE.Vector3(18, 138, 92),  target: new THREE.Vector3(0, 14, 10) },
+        side:  { pos: new THREE.Vector3(-165, 22, 18), target: new THREE.Vector3(0, 12, 14) },
+      };
+
+      let camAnim = null;
+      controls.addEventListener('start', () => { camAnim = null; });
+
+      document.querySelectorAll('.btn[data-cam]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.btn[data-cam]').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          const preset = CAM_PRESETS[btn.dataset.cam];
+          camAnim = {
+            startPos: camera.position.clone(),
+            endPos: preset.pos.clone(),
+            startTarget: controls.target.clone(),
+            endTarget: preset.target.clone(),
+            startTime: performance.now(),
+            duration: 750,
+          };
+        });
+      });
+
+      const btnToggleUI = document.getElementById('btn-toggle-ui');
+      btnToggleUI.addEventListener('click', () => {
+        const hidden = document.body.classList.toggle('hidden-ui');
+        btnToggleUI.textContent = hidden ? '显示界面' : '隐藏界面';
+      });
+
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      window.__VOXEL_DRAGON_READY__ = true;
+      requestAnimationFrame(() => {
+        document.getElementById('loading').classList.add('hidden');
+      });
+
+      function renderLoop(now) {
+        requestAnimationFrame(renderLoop);
+        if (camAnim) {
+          const k = clamp((now - camAnim.startTime) / camAnim.duration, 0, 1);
+          const ease = 1 - Math.pow(1 - k, 3);
+          camera.position.lerpVectors(camAnim.startPos, camAnim.endPos, ease);
+          controls.target.lerpVectors(camAnim.startTarget, camAnim.endTarget, ease);
+          if (k >= 1) camAnim = null;
+        }
+        controls.update();
+        renderer.render(scene, camera);
+      }
+      requestAnimationFrame(renderLoop);
+
+    } catch (err) {
+      showFatalError(err);
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gothic_Void_Citadel</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #05030a; font-family: system-ui, sans-serif; }
+    #hud { position: fixed; left: 16px; bottom: 16px; z-index: 5; padding: 9px 13px; color: #e7d9ff; background: rgba(7, 4, 16, .83); border: 1px solid rgba(181, 119, 255, .42); border-radius: 8px; font-size: 12px; letter-spacing: .02em; pointer-events: none; }
+  </style>
+  <script type="importmap">
+  { "imports": { "three": "https://unpkg.com/three@0.187.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.187.0/examples/jsm/" } }
+  </script>
+</head>
+<body>
+  <div id="hud">正在铸造虚空圣城...</div>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    const MATERIAL = {
+      floor:      { color: '#121019', block: 'minecraft:deepslate_bricks' },
+      deepslate:  { color: '#282431', block: 'minecraft:deepslate_tiles' },
+      masonry:    { color: '#3d3746', block: 'minecraft:polished_blackstone_bricks' },
+      blackstone: { color: '#17131f', block: 'minecraft:polished_blackstone' },
+      obsidian:   { color: '#0b0712', block: 'minecraft:obsidian' },
+      weathered:  { color: '#514854', block: 'minecraft:tuff' },
+      trim:       { color: '#806c44', block: 'minecraft:polished_blackstone_bricks' },
+      gold:       { color: '#c08a36', block: 'minecraft:gold_block' },
+      purple:     { color: '#8e37b7', opacity: .52, block: 'minecraft:purple_stained_glass' },
+      violet:     { color: '#c63bea', opacity: .52, block: 'minecraft:magenta_stained_glass' },
+      amethyst:   { color: '#9c55ca', block: 'minecraft:amethyst_block' },
+      ember:      { color: '#bd2eea', emissive: '#d000ff', emissiveIntensity: 1.2, isLight: true, block: 'minecraft:shroomlight' },
+      cyan:       { color: '#55d7df', emissive: '#28efff', emissiveIntensity: 1.25, isLight: true, block: 'minecraft:sea_lantern' },
+      soul:       { color: '#75d5e2', emissive: '#27dcff', emissiveIntensity: .95, isLight: true, block: 'minecraft:soul_lantern' },
+      lava:       { color: '#54226e', emissive: '#9a1ad2', emissiveIntensity: .8, isLight: true, block: 'minecraft:crying_obsidian' },
+    };
+
+    function noise(x, y, z) {
+      let value = Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263) ^ Math.imul(z | 0, 2147483647);
+      value = Math.imul(value ^ (value >>> 13), 1274126177);
+      return ((value ^ (value >>> 16)) >>> 0) / 4294967295;
+    }
+
+    class CitadelGrid {
+      constructor(meta) {
+        this.name = meta.name;
+        this.author = meta.author;
+        this.description = meta.description;
+        this.blocks = new Map();
+      }
+
+      put(x, y, z, material) {
+        if (!material || y < 0) return;
+        const ix = Math.round(x), iy = Math.round(y), iz = Math.round(z);
+        this.blocks.set(`${ix}:${iy}:${iz}`, { x: ix, y: iy, z: iz, ...material });
+      }
+
+      remove(x, y, z) { this.blocks.delete(`${Math.round(x)}:${Math.round(y)}:${Math.round(z)}`); }
+
+      cuboid(x0, y0, z0, x1, y1, z1, materialOrFn) {
+        for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) {
+          for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) {
+            for (let z = Math.min(z0, z1); z <= Math.max(z0, z1); z++) {
+              const material = typeof materialOrFn === 'function' ? materialOrFn(x, y, z) : materialOrFn;
+              this.put(x, y, z, material);
+            }
+          }
+        }
+      }
+
+      shell(x0, y0, z0, x1, y1, z1, materialOrFn) {
+        const ax = Math.min(x0, x1), bx = Math.max(x0, x1), ay = Math.min(y0, y1), by = Math.max(y0, y1), az = Math.min(z0, z1), bz = Math.max(z0, z1);
+        for (let x = ax; x <= bx; x++) for (let y = ay; y <= by; y++) for (let z = az; z <= bz; z++) {
+          if (x === ax || x === bx || y === ay || y === by || z === az || z === bz) {
+            const material = typeof materialOrFn === 'function' ? materialOrFn(x, y, z) : materialOrFn;
+            this.put(x, y, z, material);
+          }
+        }
+      }
+
+      cylinder(cx, y0, cz, radius, height, materialOrFn, hollow = false) {
+        const outer = radius * radius, inner = Math.max(0, (radius - 1.35) * (radius - 1.35));
+        for (let y = y0; y < y0 + height; y++) for (let x = -Math.ceil(radius); x <= Math.ceil(radius); x++) for (let z = -Math.ceil(radius); z <= Math.ceil(radius); z++) {
+          const distance = x * x + z * z;
+          if (distance <= outer && (!hollow || distance >= inner)) {
+            const material = typeof materialOrFn === 'function' ? materialOrFn(cx + x, y, cz + z) : materialOrFn;
+            this.put(cx + x, y, cz + z, material);
+          }
+        }
+      }
+
+      segment(x0, y0, z0, x1, y1, z1, material, thickness = 0) {
+        const count = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0, z1 - z0) * 2));
+        for (let i = 0; i <= count; i++) {
+          const t = i / count;
+          const x = Math.round(x0 + (x1 - x0) * t), y = Math.round(y0 + (y1 - y0) * t), z = Math.round(z0 + (z1 - z0) * t);
+          for (let dx = -thickness; dx <= thickness; dx++) for (let dy = -thickness; dy <= thickness; dy++) for (let dz = -thickness; dz <= thickness; dz++) this.put(x + dx, y + dy, z + dz, material);
+        }
+      }
+
+      ring(cx, cy, cz, radius, plane, material, segments = 96, thickness = 0) {
+        for (let i = 0; i < segments; i++) {
+          const angle = Math.PI * 2 * i / segments;
+          const px = cx + Math.round(Math.cos(angle) * radius * plane.u.x + Math.sin(angle) * radius * plane.v.x);
+          const py = cy + Math.round(Math.cos(angle) * radius * plane.u.y + Math.sin(angle) * radius * plane.v.y);
+          const pz = cz + Math.round(Math.cos(angle) * radius * plane.u.z + Math.sin(angle) * radius * plane.v.z);
+          for (let dx = -thickness; dx <= thickness; dx++) for (let dy = -thickness; dy <= thickness; dy++) for (let dz = -thickness; dz <= thickness; dz++) this.put(px + dx, py + dy, pz + dz, material);
+        }
+      }
+
+      export() { return { name: this.name, author: this.author, description: this.description, voxels: [...this.blocks.values()] }; }
+
+      render(scene) {
+        const geometry = new THREE.BoxGeometry(1, 1, 1), groups = new Map();
+        let minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+        const opaque = block => block && (block.opacity ?? 1) >= .95;
+        for (const block of this.blocks.values()) {
+          minX = Math.min(minX, block.x); minY = Math.min(minY, block.y); minZ = Math.min(minZ, block.z); maxX = Math.max(maxX, block.x); maxY = Math.max(maxY, block.y); maxZ = Math.max(maxZ, block.z);
+          const buried = opaque(block) && opaque(this.blocks.get(`${block.x + 1}:${block.y}:${block.z}`)) && opaque(this.blocks.get(`${block.x - 1}:${block.y}:${block.z}`)) && opaque(this.blocks.get(`${block.x}:${block.y + 1}:${block.z}`)) && opaque(this.blocks.get(`${block.x}:${block.y - 1}:${block.z}`)) && opaque(this.blocks.get(`${block.x}:${block.y}:${block.z + 1}`)) && opaque(this.blocks.get(`${block.x}:${block.y}:${block.z - 1}`));
+          if (buried) continue;
+          const key = `${block.color}|${block.opacity ?? 1}|${block.emissive ?? ''}|${block.block ?? ''}`;
+          if (!groups.has(key)) groups.set(key, { block, items: [] });
+          groups.get(key).items.push(block);
+        }
+        const root = new THREE.Group(), matrix = new THREE.Matrix4();
+        for (const { block, items } of groups.values()) {
+          const glass = (block.opacity ?? 1) < .85, luminous = Boolean(block.isLight || block.emissive);
+          const material = new THREE.MeshStandardMaterial({ color: block.color, roughness: glass ? .12 : .84, metalness: .08, transparent: glass, opacity: block.opacity ?? 1, emissive: luminous ? (block.emissive || block.color) : '#000000', emissiveIntensity: luminous ? (block.emissiveIntensity ?? 1) : 0 });
+          if (block.block) material.userData.block = block.block;
+          const mesh = new THREE.InstancedMesh(geometry, material, items.length);
+          mesh.castShadow = !glass; mesh.receiveShadow = true;
+          items.forEach((cell, index) => { matrix.makeTranslation(cell.x + .5, cell.y + .5, cell.z + .5); mesh.setMatrixAt(index, matrix); });
+          mesh.instanceMatrix.needsUpdate = true; root.add(mesh);
+        }
+        scene.add(root);
+        return { center: new THREE.Vector3((minX + maxX + 1) / 2, (minY + maxY + 1) * .46, (minZ + maxZ + 1) / 2), size: new THREE.Vector3(maxX - minX + 1, maxY - minY + 1, maxZ - minZ + 1) };
+      }
+    }
+
+    const citadel = new CitadelGrid({
+      name: 'Gothic_Void_Citadel',
+      author: 'Original_Voxel_Architect',
+      description: 'A hand-authored dark fantasy citadel with a sunken ritual plaza, four guard towers, flying buttresses, viaducts and a cyan-purple arcane core.',
+    });
+
+    const blockWall = (x, y, z) => noise(x, y, z) < .13 ? MATERIAL.weathered : (noise(x + 9, y, z - 4) < .18 ? MATERIAL.masonry : MATERIAL.deepslate);
+    const squareColumn = (x, z, y0, y1, radius, material) => citadel.shell(x - radius, y0, z - radius, x + radius, y1, z + radius, material);
+
+    function pointedWindow(x, y0, z, width, height, face, glass) {
+      const half = Math.floor(width / 2);
+      for (let row = 0; row < height; row++) {
+        const inset = row >= height - 3 ? row - (height - 3) + 1 : 0;
+        const span = Math.max(0, half - inset);
+        for (let d = -span; d <= span; d++) {
+          const x0 = face === 'east' ? x : x + d, z0 = face === 'north' ? z : z + d;
+          if (face === 'east' || face === 'west') citadel.put(x + (face === 'east' ? 0 : -0), y0 + row, z + d, glass);
+          else citadel.put(x + d, y0 + row, z, glass);
+        }
+      }
+      const frame = MATERIAL.trim;
+      const top = y0 + height;
+      if (face === 'north' || face === 'south') {
+        for (let d = -half - 1; d <= half + 1; d++) { citadel.put(x + d, y0 - 1, z, frame); citadel.put(x + d, top, z, frame); }
+        for (let row = 0; row < height + 2; row++) { citadel.put(x - half - 1, y0 - 1 + row, z, frame); citadel.put(x + half + 1, y0 - 1 + row, z, frame); }
+      } else {
+        for (let d = -half - 1; d <= half + 1; d++) { citadel.put(x, y0 - 1, z + d, frame); citadel.put(x, top, z + d, frame); }
+        for (let row = 0; row < height + 2; row++) { citadel.put(x, y0 - 1 + row, z - half - 1, frame); citadel.put(x, y0 - 1 + row, z + half + 1, frame); }
+      }
+    }
+
+    function crenellatedRing(cx, y, cz, radius, material) {
+      for (let i = 0; i < 24; i++) {
+        const a = Math.PI * 2 * i / 24;
+        if (i % 2 === 0) citadel.cuboid(Math.round(cx + Math.cos(a) * radius) - 1, y, Math.round(cz + Math.sin(a) * radius) - 1, Math.round(cx + Math.cos(a) * radius) + 1, y + 2, Math.round(cz + Math.sin(a) * radius) + 1, material);
+      }
+    }
+
+    function obelisk(x, z, height) {
+      citadel.cylinder(x, 4, z, 3, height, MATERIAL.obsidian, true);
+      for (let i = 0; i < 5; i++) citadel.cuboid(x - Math.max(1, 3 - i), 4 + height + i, z - Math.max(1, 3 - i), x + Math.max(1, 3 - i), 4 + height + i, z + Math.max(1, 3 - i), i % 2 ? MATERIAL.amethyst : MATERIAL.blackstone);
+      citadel.put(x, 4 + height + 5, z, MATERIAL.ember);
+    }
+
+    function guardTower(cx, cz, rotation) {
+      const base = 6, top = 45, radius = 10;
+      citadel.cylinder(cx, base, cz, radius + 2, 3, MATERIAL.blackstone);
+      citadel.cylinder(cx, base + 3, cz, radius, top - base - 3, (x, y, z) => noise(x, y, z) < .12 ? MATERIAL.weathered : MATERIAL.deepslate, true);
+      citadel.cylinder(cx, top, cz, radius + 2, 2, MATERIAL.trim);
+      citadel.cylinder(cx, top + 2, cz, radius - 1, 3, MATERIAL.blackstone);
+      for (let y = 15; y < 39; y += 8) {
+        for (let a = 0; a < 4; a++) {
+          const angle = rotation + a * Math.PI / 2;
+          const wx = Math.round(cx + Math.cos(angle) * radius), wz = Math.round(cz + Math.sin(angle) * radius);
+          if (Math.abs(Math.cos(angle)) > .7) pointedWindow(wx, y, wz, 3, 5, 'east', MATERIAL.purple);
+          else pointedWindow(wx, y, wz, 3, 5, 'north', MATERIAL.purple);
+          citadel.put(wx, y + 5, wz, MATERIAL.ember);
+        }
+      }
+      for (let i = 0; i < 10; i++) {
+        const a = Math.PI * 2 * i / 10;
+        const px = Math.round(cx + Math.cos(a) * (radius + 1)), pz = Math.round(cz + Math.sin(a) * (radius + 1));
+        citadel.cuboid(px - 1, top + 2, pz - 1, px + 1, top + 5, pz + 1, MATERIAL.obsidian);
+      }
+      const roof = top + 5;
+      for (let level = 0; level < 13; level++) {
+        const r = Math.max(1, 8 - Math.floor(level * 7 / 12));
+        citadel.cuboid(cx - r, roof + level, cz - r, cx + r, roof + level, cz + r, level % 3 === 0 ? MATERIAL.masonry : MATERIAL.blackstone);
+      }
+      citadel.put(cx, roof + 14, cz, MATERIAL.cyan);
+      citadel.put(cx, roof + 15, cz, MATERIAL.obsidian);
+      citadel.put(cx, roof + 16, cz, MATERIAL.soul);
+    }
+
+    function cathedral() {
+      citadel.cuboid(50, 4, 50, 94, 6, 94, MATERIAL.blackstone);
+      citadel.shell(55, 7, 55, 89, 53, 89, blockWall);
+      citadel.cuboid(59, 8, 59, 85, 8, 85, MATERIAL.masonry);
+      citadel.cuboid(61, 9, 61, 83, 11, 83, MATERIAL.floor);
+      for (const [x, z] of [[57, 57], [57, 87], [87, 57], [87, 87]]) {
+        citadel.cylinder(x, 7, z, 4, 48, MATERIAL.blackstone, false);
+        citadel.cylinder(x, 9, z, 2, 45, MATERIAL.trim, true);
+      }
+      for (let y = 16; y <= 44; y += 9) {
+        pointedWindow(72, y, 55, 5, 6, 'north', MATERIAL.violet);
+        pointedWindow(72, y, 89, 5, 6, 'south', MATERIAL.violet);
+        pointedWindow(55, y, 72, 5, 6, 'west', MATERIAL.violet);
+        pointedWindow(89, y, 72, 5, 6, 'east', MATERIAL.violet);
+        for (const [x, z] of [[58, 58], [86, 58], [58, 86], [86, 86]]) {
+          citadel.put(x, y + 2, z, MATERIAL.amethyst);
+          citadel.put(x, y + 3, z, MATERIAL.ember);
+        }
+      }
+      for (let y = 14; y < 52; y += 4) {
+        citadel.cuboid(50, y, 50, 53, y + 1, 94, MATERIAL.trim);
+        citadel.cuboid(91, y, 50, 94, y + 1, 94, MATERIAL.trim);
+        citadel.cuboid(50, y, 50, 94, y + 1, 53, MATERIAL.trim);
+        citadel.cuboid(50, y, 91, 94, y + 1, 94, MATERIAL.trim);
+      }
+      citadel.cuboid(47, 53, 47, 97, 56, 97, MATERIAL.trim);
+      citadel.cuboid(51, 56, 51, 93, 58, 93, MATERIAL.blackstone);
+      for (let level = 0; level < 26; level++) {
+        const r = Math.max(2, 20 - Math.floor(level * 18 / 25));
+        const material = level % 5 === 0 ? MATERIAL.trim : (level % 3 === 0 ? MATERIAL.masonry : MATERIAL.blackstone);
+        citadel.cylinder(72, 58 + level, 72, r, 1, material, false);
+        if (level % 4 === 1) {
+          citadel.put(72 + r, 58 + level, 72, MATERIAL.amethyst);
+          citadel.put(72 - r, 58 + level, 72, MATERIAL.amethyst);
+          citadel.put(72, 58 + level, 72 + r, MATERIAL.amethyst);
+          citadel.put(72, 58 + level, 72 - r, MATERIAL.amethyst);
+        }
+      }
+      for (const [x, z] of [[57, 72], [87, 72], [72, 57], [72, 87]]) {
+        citadel.segment(x, 15, z, x + (x < 72 ? -5 : x > 72 ? 5 : 0), 52, z + (z < 72 ? -5 : z > 72 ? 5 : 0), MATERIAL.obsidian, 1);
+      }
+      for (let y = 84; y < 98; y++) {
+        const radius = Math.max(1, 7 - Math.floor((y - 84) / 3));
+        citadel.cuboid(72 - radius, y, 72 - radius, 72 + radius, y, 72 + radius, y % 4 === 0 ? MATERIAL.trim : MATERIAL.obsidian);
+      }
+      citadel.put(72, 99, 72, MATERIAL.amethyst);
+    }
+
+    function viaduct(toX, toZ, axis) {
+      const from = 46, to = axis === 'x' ? toX : toZ;
+      const direction = Math.sign(to - 72);
+      const start = 72 + direction * 23, end = to - direction * 11;
+      for (const [y, width, material] of [[22, 3, MATERIAL.blackstone], [27, 2, MATERIAL.masonry], [32, 1, MATERIAL.trim]]) {
+        for (let p = start; p !== end + direction; p += direction) {
+          const curve = Math.round(Math.sin(Math.PI * Math.abs(p - start) / Math.max(1, Math.abs(end - start))) * 5);
+          if (axis === 'x') citadel.cuboid(p, y + curve, 72 - width, p, y + curve + 1, 72 + width, material);
+          else citadel.cuboid(72 - width, y + curve, p, 72 + width, y + curve + 1, p, material);
+        }
+        for (let p = start; p !== end + direction; p += direction) {
+          const curve = Math.round(Math.sin(Math.PI * Math.abs(p - start) / Math.max(1, Math.abs(end - start))) * 5);
+          if (axis === 'x') { citadel.put(p, y + curve + 2, 72 - width - 1, MATERIAL.obsidian); citadel.put(p, y + curve + 2, 72 + width + 1, MATERIAL.obsidian); }
+          else { citadel.put(72 - width - 1, y + curve + 2, p, MATERIAL.obsidian); citadel.put(72 + width + 1, y + curve + 2, p, MATERIAL.obsidian); }
+        }
+      }
+      for (let i = 0; i < 6; i++) {
+        const p = Math.round(start + (end - start) * i / 5), archY = 18 + Math.round(Math.sin(Math.PI * i / 5) * 6);
+        if (axis === 'x') citadel.segment(p, 8, 72 - 5, p, archY, 72 - 5, MATERIAL.masonry, 1);
+        else citadel.segment(72 - 5, 8, p, 72 - 5, archY, p, MATERIAL.masonry, 1);
+      }
+    }
+
+    // Deep stepped plaza foundation and its irregular perimeter.
+    citadel.cuboid(5, 0, 5, 139, 1, 139, (x, y, z) => noise(x, y, z) < .12 ? MATERIAL.weathered : MATERIAL.floor);
+    citadel.cuboid(11, 2, 11, 133, 3, 133, MATERIAL.blackstone);
+    citadel.cuboid(17, 4, 17, 127, 5, 127, MATERIAL.masonry);
+    citadel.cuboid(22, 6, 22, 122, 6, 122, MATERIAL.floor);
+    for (let x = 15; x <= 129; x += 6) { citadel.cuboid(x, 7, 12, x + 2, 10, 15, MATERIAL.obsidian); citadel.cuboid(x, 7, 125, x + 2, 10, 128, MATERIAL.obsidian); }
+    for (let z = 15; z <= 129; z += 6) { citadel.cuboid(12, 7, z, 15, 10, z + 2, MATERIAL.obsidian); citadel.cuboid(125, 7, z, 128, 10, z + 2, MATERIAL.obsidian); }
+    // Four broad staircases descend from the perimeter into the ritual basin.
+    for (let i = 0; i < 9; i++) {
+      citadel.cuboid(64 - i, 7 - Math.floor(i / 2), 16 + i * 3, 80 + i, 7 - Math.floor(i / 2), 18 + i * 3, MATERIAL.trim);
+      citadel.cuboid(64 - i, 7 - Math.floor(i / 2), 126 - i * 3, 80 + i, 7 - Math.floor(i / 2), 124 - i * 3, MATERIAL.trim);
+      citadel.cuboid(16 + i * 3, 7 - Math.floor(i / 2), 64 - i, 18 + i * 3, 7 - Math.floor(i / 2), 80 + i, MATERIAL.trim);
+      citadel.cuboid(126 - i * 3, 7 - Math.floor(i / 2), 64 - i, 124 - i * 3, 7 - Math.floor(i / 2), 80 + i, MATERIAL.trim);
+    }
+
+    // A giant inlaid magic circle is intentionally built one voxel at a time.
+    citadel.ring(72, 7, 72, 39, { u: { x: 1, y: 0, z: 0 }, v: { x: 0, y: 0, z: 1 } }, MATERIAL.obsidian, 160, 1);
+    citadel.ring(72, 8, 72, 34, { u: { x: 1, y: 0, z: 0 }, v: { x: 0, y: 0, z: 1 } }, MATERIAL.violet, 144, 0);
+    citadel.ring(72, 8, 72, 24, { u: { x: 1, y: 0, z: 0 }, v: { x: 0, y: 0, z: 1 } }, MATERIAL.amethyst, 112, 0);
+    citadel.ring(72, 8, 72, 11, { u: { x: 1, y: 0, z: 0 }, v: { x: 0, y: 0, z: 1 } }, MATERIAL.ember, 72, 0);
+    for (let ray = 0; ray < 8; ray++) {
+      const angle = ray * Math.PI / 4;
+      citadel.segment(72, 8, 72, Math.round(72 + Math.cos(angle) * 38), 8, Math.round(72 + Math.sin(angle) * 38), ray % 2 ? MATERIAL.violet : MATERIAL.amethyst, 0);
+      citadel.put(Math.round(72 + Math.cos(angle) * 28), 9, Math.round(72 + Math.sin(angle) * 28), MATERIAL.ember);
+    }
+    citadel.cylinder(72, 8, 72, 6, 2, MATERIAL.obsidian);
+    citadel.cylinder(72, 10, 72, 3, 1, MATERIAL.ember);
+
+    // Purple lava channels cut through the basin in a four-way ritual cross.
+    for (let p = 20; p <= 124; p++) {
+      const channel = p % 7 === 0 ? MATERIAL.amethyst : MATERIAL.lava;
+      citadel.cuboid(p, 7, 70, p, 7, 73, channel);
+      citadel.cuboid(70, 7, p, 73, 7, p, channel);
+      if (p % 8 === 0) { citadel.put(p, 8, 70, MATERIAL.ember); citadel.put(70, 8, p, MATERIAL.ember); }
+    }
+
+    cathedral();
+    guardTower(20, 20, 0); guardTower(124, 20, Math.PI / 4); guardTower(124, 124, 0); guardTower(20, 124, Math.PI / 4);
+    viaduct(20, 72, 'x'); viaduct(124, 72, 'x'); viaduct(72, 20, 'z'); viaduct(72, 124, 'z');
+
+    // Curved, stepped flying buttresses crown the nave from eight directions.
+    for (let arm = 0; arm < 8; arm++) {
+      const a = arm * Math.PI / 4, ux = Math.cos(a), uz = Math.sin(a);
+      const points = [[28, 16], [34, 22], [40, 30], [44, 39]];
+      for (const [distance, y] of points) {
+        const px = Math.round(72 + ux * distance), pz = Math.round(72 + uz * distance);
+        citadel.cuboid(px - 2, y, pz - 2, px + 2, y + 5, pz + 2, MATERIAL.masonry);
+        citadel.put(Math.round(px + ux * 2), y + 3, Math.round(pz + uz * 2), MATERIAL.trim);
+      }
+      citadel.segment(Math.round(72 + ux * 27), 17, Math.round(72 + uz * 27), Math.round(72 + ux * 43), 43, Math.round(72 + uz * 43), MATERIAL.blackstone, 2);
+      citadel.segment(Math.round(72 + ux * 31), 21, Math.round(72 + uz * 31), Math.round(72 + ux * 43), 43, Math.round(72 + uz * 43), MATERIAL.trim, 0);
+    }
+
+    // Jagged walls and eleven obsidian obelisks make the perimeter read as a fortress.
+    citadel.shell(8, 7, 8, 136, 18, 136, MATERIAL.obsidian);
+    for (let x = 10; x <= 134; x += 7) { citadel.put(x, 19 + (x % 3), 8, MATERIAL.trim); citadel.put(x, 19 + ((x + 1) % 3), 136, MATERIAL.trim); }
+    for (let z = 10; z <= 134; z += 7) { citadel.put(8, 19 + (z % 3), z, MATERIAL.trim); citadel.put(136, 19 + ((z + 1) % 3), z, MATERIAL.trim); }
+    [[28, 9, 20], [72, 9, 24], [116, 9, 20], [9, 46, 20], [9, 90, 24], [9, 126, 20], [135, 46, 20], [135, 90, 24], [135, 126, 20], [28, 135, 20], [72, 135, 24], [116, 135, 20]].forEach(([x, z, h]) => obelisk(x, z, h));
+
+    // The hovering forbidden core and its thick, tilted ring system.
+    citadel.cylinder(72, 98, 72, 5, 3, MATERIAL.obsidian);
+    citadel.ring(72, 101, 72, 9, { u: { x: 1, y: 0, z: 0 }, v: { x: 0, y: 0, z: 1 } }, MATERIAL.cyan, 72, 1);
+    citadel.ring(72, 101, 72, 13, { u: { x: .9, y: .3, z: 0 }, v: { x: -.28, y: .84, z: .46 } }, MATERIAL.amethyst, 84, 1);
+    citadel.ring(72, 101, 72, 17, { u: { x: .82, y: -.38, z: .42 }, v: { x: -.35, y: .77, z: .52 } }, MATERIAL.violet, 96, 1);
+    citadel.cylinder(72, 98, 72, 5, 6, MATERIAL.amethyst, false);
+    citadel.cylinder(72, 100, 72, 3, 4, MATERIAL.ember, false);
+    citadel.put(72, 103, 72, MATERIAL.cyan);
+    for (const [tx, tz] of [[20, 20], [124, 20], [124, 124], [20, 124]]) {
+      citadel.segment(72, 102, 72, tx, 59, tz, MATERIAL.cyan, 1);
+      citadel.segment(72, 104, 72, tx, 60, tz, MATERIAL.soul, 0);
+      citadel.put(tx, 59, tz, MATERIAL.cyan);
+    }
+    for (let i = 0; i < 16; i++) {
+      const a = i * Math.PI / 8;
+      const x = Math.round(72 + Math.cos(a) * 22), z = Math.round(72 + Math.sin(a) * 22);
+      citadel.put(x, 105 + (i % 3), z, i % 2 ? MATERIAL.ember : MATERIAL.cyan);
+    }
+
+    // Structured export is consumed losslessly by three2litematic.
+    window.__VOXEL_DATA__ = citadel.export();
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color('#05030a');
+    const view = citadel.render(scene);
+    const maxDimension = Math.max(view.size.x, view.size.y, view.size.z, 16);
+    const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, .1, 2400);
+    camera.position.set(view.center.x + maxDimension * 1.18, view.center.y + maxDimension * .78, view.center.z + maxDimension * 1.18);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight); renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); renderer.shadowMap.enabled = citadel.blocks.size < 12000; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.08; document.body.appendChild(renderer.domElement);
+    const controls = new OrbitControls(camera, renderer.domElement); controls.target.copy(view.center); controls.enableDamping = true; controls.minDistance = maxDimension * .55; controls.maxDistance = maxDimension * 2.4;
+    scene.add(new THREE.HemisphereLight(0x8070ac, 0x0b0712, .68));
+    const moon = new THREE.DirectionalLight(0xb5b8ff, 1.35); moon.position.set(view.center.x - maxDimension, view.center.y + maxDimension * 1.4, view.center.z + maxDimension * .45); moon.castShadow = renderer.shadowMap.enabled; scene.add(moon);
+    const coreGlow = new THREE.PointLight(0xb817ff, 4.2, 180); coreGlow.position.set(72, 101, 72); scene.add(coreGlow);
+    const channelGlow = new THREE.PointLight(0x7e17aa, 1.25, 120); channelGlow.position.set(72, 12, 72); scene.add(channelGlow);
+    document.getElementById('hud').textContent = `${citadel.name} · ${view.size.x}×${view.size.y}×${view.size.z} · ${citadel.blocks.size} 方块 · 拖拽旋转 / 滚轮缩放`;
+    window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+    renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+  </script>
+</body>
+</html>

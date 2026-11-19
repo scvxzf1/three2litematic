@@ -1,0 +1,37 @@
+{
+  "id": "魔法塔-748a",
+  "name": "魔法塔",
+  "sourceExt": "html",
+  "tags": [],
+  "favorite": false,
+  "dimensions": {
+    "width": 173,
+    "height": 169,
+    "length": 175
+  },
+  "blockCount": 146031,
+  "materialCount": 41,
+  "config": {
+    "versionPreset": "1.21",
+    "scaleMode": "auto",
+    "targetSize": 64,
+    "useSlabs": true,
+    "hollowInterior": true,
+    "excludeGravity": true,
+    "survivalFriendly": true,
+    "preferScene": false,
+    "preferLightBlocks": false,
+    "brightness": 8,
+    "saturation": 85,
+    "ditherStrength": 15,
+    "disabledBlocks": [],
+    "disabledFamilies": [
+      "wool"
+    ],
+    "blockOverrides": {
+      "minecraft:stone_bricks": "minecraft:calcite"
+    }
+  },
+  "createdAt": 1795079928730,
+  "updatedAt": 1795079939943
+}

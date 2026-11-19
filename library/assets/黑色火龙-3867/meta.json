@@ -1,0 +1,37 @@
+{
+  "id": "黑色火龙-3867",
+  "name": "黑色火龙",
+  "sourceExt": "html",
+  "tags": [],
+  "favorite": false,
+  "dimensions": {
+    "width": 189,
+    "height": 108,
+    "length": 236
+  },
+  "blockCount": 28959,
+  "materialCount": 24,
+  "config": {
+    "versionPreset": "1.21",
+    "scaleMode": "auto",
+    "targetSize": 64,
+    "useSlabs": true,
+    "hollowInterior": true,
+    "excludeGravity": true,
+    "survivalFriendly": true,
+    "preferScene": false,
+    "preferLightBlocks": false,
+    "brightness": 8,
+    "saturation": 85,
+    "ditherStrength": 15,
+    "disabledBlocks": [],
+    "disabledFamilies": [
+      "wool"
+    ],
+    "blockOverrides": {
+      "minecraft:stone_bricks": "minecraft:calcite"
+    }
+  },
+  "createdAt": 1795085670562,
+  "updatedAt": 1795085670562
+}
