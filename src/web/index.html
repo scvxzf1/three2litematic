@@ -225,6 +225,23 @@
 
         <!-- Tab 1: Basic & Material Families -->
         <div id="paramPaneBasic" class="param-pane">
+          <div class="model-diagnostic-box">
+            <div class="model-diagnostic-header">
+              <strong>🩺 模型自助诊断</strong>
+              <button id="diagnoseModelBtn" class="btn-mini">开始诊断</button>
+            </div>
+            <p class="hint-text">检查当前模型的体素数据、重复坐标、无效坐标和场景背景。</p>
+            <div id="modelDiagnosticReport" class="model-diagnostic-report hidden" role="status" aria-live="polite">
+              <div id="modelDiagnosticSummary" class="model-diagnostic-summary"></div>
+              <ul id="modelDiagnosticFindings" class="model-diagnostic-findings"></ul>
+              <div class="model-diagnostic-actions">
+                <button id="applyGenericRepairBtn" class="btn btn-primary" disabled>🛠️ 使用通用修复</button>
+                <button id="undoGenericRepairBtn" class="btn-mini hidden">↩ 撤销内存修复</button>
+              </div>
+            </div>
+            <p id="modelRepairMemoryNote" class="model-diagnostic-memory-note">修复需你确认；只缓存于本次工作台内存，不改写原始文件。</p>
+          </div>
+
           <label class="field">
             <span>作品 / 蓝图名称</span>
             <input id="schemNameInput" type="text" value="ThreeJS_Voxel_Build" placeholder="输入资产与蓝图名称" />
@@ -641,7 +658,10 @@
 
   <!-- Dropzone Overlay -->
   <div id="dropOverlay" class="drop-overlay hidden">
-    <div class="drop-box">松开鼠标导入（支持一次拖入多个文件批量入库！）<code>.html</code> / <code>.json</code> / <code>.litematic</code> / <code>.schem</code></div>
+    <div class="drop-box">
+      <div>松开鼠标导入（支持一次拖入多个文件批量入库！）<code>.html</code> / <code>.json</code> / <code>.litematic</code> / <code>.schem</code></div>
+      <div class="drop-box-hint">拖拽已取消？按 <kbd>Esc</kbd> 或点击遮罩关闭</div>
+    </div>
   </div>
 
   <div id="toast" class="toast hidden"></div>

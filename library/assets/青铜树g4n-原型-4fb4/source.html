@@ -1,0 +1,2517 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>古代青铜巨树城邦 · 200格高程序化3D体素模型</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      background: #141923;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: #efe7d6;
+      user-select: none;
+    }
+    #canvas-wrap { width: 100%; height: 100%; position: relative; }
+
+    /* 加载遮罩 */
+    #loader {
+      position: fixed; inset: 0; z-index: 100;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: radial-gradient(circle at 50% 45%, #232a36 0%, #11151d 100%);
+      transition: opacity 0.6s ease;
+    }
+    #loader.hidden { opacity: 0; pointer-events: none; }
+    .loader-title {
+      font-size: 24px; letter-spacing: 5px; font-weight: 600;
+      color: #e6c382; margin-bottom: 12px;
+      text-shadow: 0 2px 14px rgba(230, 195, 130, 0.35);
+    }
+    .loader-sub {
+      font-size: 13px; color: #a7b4c4; letter-spacing: 1px; margin-bottom: 18px;
+    }
+    .loader-bar {
+      width: 260px; height: 4px; background: rgba(255,255,255,0.1);
+      border-radius: 99px; overflow: hidden;
+    }
+    .loader-fill {
+      width: 10%; height: 100%;
+      background: linear-gradient(90deg, #b8843f, #5ba892, #f2d085);
+      transition: width 0.25s ease;
+    }
+
+    /* 顶部标题与性能监测 */
+    #hud-top {
+      position: fixed; top: 16px; left: 16px; z-index: 10;
+      background: rgba(16, 21, 29, 0.72);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(212, 174, 106, 0.28);
+      border-radius: 10px;
+      padding: 12px 16px;
+      max-width: 340px;
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+    }
+    #hud-top h1 {
+      font-size: 16px; letter-spacing: 2px; color: #eccb8a; margin-bottom: 4px;
+    }
+    #hud-top p {
+      font-size: 11.5px; color: #b9c3cf; line-height: 1.5;
+    }
+    #stats {
+      margin-top: 8px; padding-top: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px;
+      font-size: 11px; color: #96c7b7;
+      font-variant-numeric: tabular-nums;
+    }
+    #stats span b { color: #f1dfba; font-weight: 600; }
+
+    /* 右下角机位与控制栏 */
+    #hud-controls {
+      position: fixed; right: 16px; bottom: 16px; z-index: 10;
+      display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+    }
+    .cam-group {
+      display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px;
+      max-width: 440px;
+      background: rgba(16, 21, 29, 0.72);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(212, 174, 106, 0.26);
+      border-radius: 10px;
+      padding: 8px;
+    }
+    button.ui-btn {
+      background: rgba(255, 255, 255, 0.06);
+      color: #e9e0ce;
+      border: 1px solid rgba(212, 174, 106, 0.25);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+    button.ui-btn:hover {
+      background: rgba(212, 174, 106, 0.22);
+      border-color: rgba(236, 203, 138, 0.65);
+      color: #fff;
+    }
+    button.ui-btn.active {
+      background: rgba(91, 168, 146, 0.3);
+      border-color: #6bc4aa;
+      color: #fff;
+    }
+
+    /* 左下角图例提示 */
+    #hud-hint {
+      position: fixed; left: 16px; bottom: 16px; z-index: 10;
+      background: rgba(16, 21, 29, 0.65);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 11px;
+      color: #b4becc;
+      line-height: 1.6;
+    }
+    .dot {
+      display: inline-block; width: 8px; height: 8px; border-radius: 2px;
+      margin-right: 4px; vertical-align: middle;
+    }
+  </style>
+
+  <!-- 原生 Three.js 与 OrbitControls（通过 jsDelivr CDN 加载，零外部贴图/模型依赖） -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="loader">
+    <div class="loader-title">古代青铜巨树城邦</div>
+    <div class="loader-sub" id="loader-status">正在初始化 180 × 215 × 180 体素网格...</div>
+    <div class="loader-bar"><div class="loader-fill" id="loader-fill"></div></div>
+  </div>
+
+  <div id="canvas-wrap"></div>
+
+  <div id="hud-top">
+    <h1>古代青铜巨树城邦</h1>
+    <p>1×1×1 全等体素构建 · 6邻域隐藏面剔除 · 三材质 InstancedMesh 渲染</p>
+    <div id="stats">
+      <span>树冠最高点: <b id="st-height">--</b></span>
+      <span>剔除优化率: <b id="st-cull">--</b></span>
+      <span>总实心体素: <b id="st-solid">--</b></span>
+      <span>渲染实例数: <b id="st-vis">--</b></span>
+      <span>青铜金属类: <b id="st-bronze">--</b></span>
+      <span>石木 / 自发光: <b id="st-other">--</b></span>
+    </div>
+  </div>
+
+  <div id="hud-hint">
+    <div><span class="dot" style="background:#8a6838"></span>铸造青铜与氧化铜绿（主干 / 盘根 / 枝冠 / 桁架）</div>
+    <div><span class="dot" style="background:#ddd6c7"></span>浅灰白石砖与瓦顶木梁（居住区 / 大殿 / 工坊 / 观星塔）</div>
+    <div><span class="dot" style="background:#ffba49"></span>自发光窗格、路灯、索桥灯笼与熔炉火光</div>
+    <div style="margin-top:3px;color:#8e9bad">操作：左键旋转 · 滚轮缩放 · 右键平移</div>
+  </div>
+
+  <div id="hud-controls">
+    <div class="cam-group">
+      <button class="ui-btn" data-cam="overview">全貌全景</button>
+      <button class="ui-btn" data-cam="roots">盘根与螺旋梯</button>
+      <button class="ui-btn" data-cam="hub">树心枢纽广场</button>
+      <button class="ui-btn" data-cam="forge">高空锻造风车</button>
+      <button class="ui-btn" data-cam="observatory">观星高塔星环</button>
+      <button class="ui-btn" data-cam="hall">石制大殿与索桥</button>
+    </div>
+    <div class="cam-group">
+      <button class="ui-btn active" id="btn-rotate">自动缓转: 开</button>
+      <button class="ui-btn active" id="btn-shadow">实时阴影: 开</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // =========================================================================
+    // 模块 1：体素网格核心引擎、材质编码与确定性随机工具
+    // =========================================================================
+
+    const GX = 180;
+    const GY = 215;
+    const GZ = 180;
+    const OX = 90;  // 世界 X ∈ [-90, 89]
+    const OZ = 90;  // 世界 Z ∈ [-90, 89]
+
+    // 一维 Uint8Array 存储全部体素材质 ID（约 6.97 MB）
+    const voxelGrid = new Uint8Array(GX * GY * GZ);
+
+    // 体素材质 ID 定义
+    const MAT = {
+      AIR: 0,
+
+      // ① 铸造青铜类（Group 0: metalness 0.72, roughness 0.38）
+      BRONZE_DARK: 1,       // 深古铜色（主干底色、树皮凹槽）
+      BRONZE_MID: 2,        // 经典铸造古铜（枝干、斜撑、基座）
+      BRONZE_GOLD: 3,       // 暗金高光青铜（筋条、箍环、星环、栏杆饰条）
+      BRONZE_VERDIGRIS: 4,  // 氧化铜绿（沟槽与平台缝隙铜锈）
+      BRONZE_LEAF_DARK: 5,  // 暗绿铜叶底面
+      BRONZE_LEAF_MID: 6,   // 铜绿雕塑叶片主体
+      BRONZE_LEAF_GOLD: 7,  // 鎏金古铜叶梢
+      BRONZE_CHAIN: 8,      // 深褐铸铁青铜（索链、缆绳、桁架、吊臂）
+
+      // ② 石材与木石建筑类（Group 1: metalness 0.06, roughness 0.86）
+      EARTH_ROCK: 10,       // 底层基岩与厚重岩土
+      STONE_DARK: 11,       // 深灰承重石基、拱券、柱础
+      STONE_LIGHT: 12,      // 浅灰白石砖（核心建筑外墙，强材质反差）
+      STONE_CREAM: 13,      // 暖白雕石（广场铺砖、檐口、石阶、柱廊）
+      STONE_WEATHER: 14,    // 风化斑驳石料
+      WOOD_DARK: 15,        // 深色木梁、半木结构、风车骨架
+      WOOD_PLANK: 16,       // 暖木桥板、阳台、升降吊篮
+      ROOF_RED: 17,         // 深红/赤陶瓦顶
+      ROOF_SLATE: 18,       // 青灰石板瓦顶
+      FABRIC_SAIL: 19,      // 米白风车帆布翼片 / 篷布
+
+      // ③ 自发光类（Group 2: emissive）
+      LIGHT_WINDOW: 25,     // 暖黄窗户灯光
+      LIGHT_LANTERN: 26,    // 琥珀金青铜路灯与桥灯笼
+      LIGHT_FORGE: 27,      // 炽热橙红熔炉火光
+      LIGHT_STAR: 28        // 暖白星辉（观星塔星环核心、枢纽祭坛圣火）
+    };
+
+    // 材质分组映射（0=铸造青铜, 1=石材木石, 2=自发光）
+    function getMatGroup(id) {
+      if (id <= 9) return 0;
+      if (id <= 24) return 1;
+      return 2;
+    }
+
+    // 基础调色板（十六进制颜色 + 抖动幅度）
+    const PALETTE = {
+      [MAT.BRONZE_DARK]:      { hex: 0x3f3021, jitter: 0.07 },
+      [MAT.BRONZE_MID]:       { hex: 0x674c31, jitter: 0.08 },
+      [MAT.BRONZE_GOLD]:      { hex: 0xa98245, jitter: 0.07 },
+      [MAT.BRONZE_VERDIGRIS]: { hex: 0x457d6c, jitter: 0.11 },
+      [MAT.BRONZE_LEAF_DARK]: { hex: 0x2d5347, jitter: 0.09 },
+      [MAT.BRONZE_LEAF_MID]:  { hex: 0x4b8b77, jitter: 0.12 },
+      [MAT.BRONZE_LEAF_GOLD]: { hex: 0x9c8249, jitter: 0.10 },
+      [MAT.BRONZE_CHAIN]:     { hex: 0x3b332c, jitter: 0.06 },
+
+      [MAT.EARTH_ROCK]:       { hex: 0x4b4640, jitter: 0.08 },
+      [MAT.STONE_DARK]:       { hex: 0x707276, jitter: 0.07 },
+      [MAT.STONE_LIGHT]:      { hex: 0xd5cfc2, jitter: 0.06 },
+      [MAT.STONE_CREAM]:      { hex: 0xe6dfd0, jitter: 0.05 },
+      [MAT.STONE_WEATHER]:    { hex: 0xb0aa9d, jitter: 0.08 },
+      [MAT.WOOD_DARK]:        { hex: 0x4c3322, jitter: 0.07 },
+      [MAT.WOOD_PLANK]:       { hex: 0x8a5e3c, jitter: 0.08 },
+      [MAT.ROOF_RED]:         { hex: 0x8f3a2e, jitter: 0.08 },
+      [MAT.ROOF_SLATE]:       { hex: 0x4a5968, jitter: 0.08 },
+      [MAT.FABRIC_SAIL]:      { hex: 0xe9dec8, jitter: 0.04 },
+
+      [MAT.LIGHT_WINDOW]:     { hex: 0xffcf6e, jitter: 0.05 },
+      [MAT.LIGHT_LANTERN]:    { hex: 0xffa638, jitter: 0.05 },
+      [MAT.LIGHT_FORGE]:      { hex: 0xff4614, jitter: 0.08 },
+      [MAT.LIGHT_STAR]:       { hex: 0xfff0c4, jitter: 0.03 }
+    };
+
+    // 确定性伪随机数（Mulberry32）
+    let rngState = 20250518;
+    function rand() {
+      rngState |= 0;
+      rngState = (rngState + 0x6D2B79F5) | 0;
+      let t = Math.imul(rngState ^ (rngState >>> 15), 1 | rngState);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    }
+
+    // 快速确定性 3D 整型哈希 [0, 1)
+    function hash3(x, y, z) {
+      let n = (Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(z, 2147483647)) | 0;
+      n = Math.imul(n ^ (n >>> 13), 1274126177);
+      return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
+    }
+
+    // 简易平滑 3D 噪声（用于铜锈斑驳与树叶层次）
+    function noise3(x, y, z) {
+      const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
+      const xf = x - xi, yf = y - yi, zf = z - zi;
+      const u = xf * xf * (3 - 2 * xf);
+      const v = yf * yf * (3 - 2 * yf);
+      const w = zf * zf * (3 - 2 * zf);
+      const n000 = hash3(xi, yi, zi),         n100 = hash3(xi + 1, yi, zi);
+      const n010 = hash3(xi, yi + 1, zi),     n110 = hash3(xi + 1, yi + 1, zi);
+      const n001 = hash3(xi, yi, zi + 1),     n101 = hash3(xi + 1, yi, zi + 1);
+      const n011 = hash3(xi, yi + 1, zi + 1), n111 = hash3(xi + 1, yi + 1, zi + 1);
+      const nx00 = n000 + u * (n100 - n000);
+      const nx10 = n010 + u * (n110 - n010);
+      const nx01 = n001 + u * (n101 - n001);
+      const nx11 = n011 + u * (n111 - n011);
+      const nxy0 = nx00 + v * (nx10 - nx00);
+      const nxy1 = nx01 + v * (nx11 - nx01);
+      return nxy0 + w * (nxy1 - nxy0);
+    }
+
+    // 体素读写基础函数（坐标均为整数）
+    function setVoxel(x, y, z, id) {
+      const ix = (x | 0) + OX;
+      const iy = y | 0;
+      const iz = (z | 0) + OZ;
+      if (ix < 0 || ix >= GX || iy < 0 || iy >= GY || iz < 0 || iz >= GZ) return;
+      voxelGrid[(iy * GZ + iz) * GX + ix] = id;
+    }
+
+    function getVoxel(x, y, z) {
+      const iy = y | 0;
+      if (iy < 0) return MAT.EARTH_ROCK; // 地面以下视为实心，避免渲染地底不可见面
+      const ix = (x | 0) + OX;
+      const iz = (z | 0) + OZ;
+      if (ix < 0 || ix >= GX || iy >= GY || iz < 0 || iz >= GZ) return 0;
+      return voxelGrid[(iy * GZ + iz) * GX + ix];
+    }
+
+    function setVoxelIfAir(x, y, z, id) {
+      if (getVoxel(x, y, z) === 0) setVoxel(x, y, z, id);
+    }
+
+    // 填充实心盒体
+    function fillBox(x0, y0, z0, x1, y1, z1, id) {
+      const minX = Math.min(x0, x1) | 0, maxX = Math.max(x0, x1) | 0;
+      const minY = Math.min(y0, y1) | 0, maxY = Math.max(y0, y1) | 0;
+      const minZ = Math.min(z0, z1) | 0, maxZ = Math.max(z0, z1) | 0;
+      for (let y = minY; y <= maxY; y++) {
+        for (let z = minZ; z <= maxZ; z++) {
+          for (let x = minX; x <= maxX; x++) {
+            setVoxel(x, y, z, id);
+          }
+        }
+      }
+    }
+
+    // 绘制 3D 体素线段（Bresenham / 密集采样，支持半径）
+    function drawVoxelLine(x0, y0, z0, x1, y1, z1, id, r = 0) {
+      const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
+      const steps = Math.max(1, Math.ceil(Math.hypot(dx, dy, dz) * 1.6));
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const cx = Math.round(x0 + dx * t);
+        const cy = Math.round(y0 + dy * t);
+        const cz = Math.round(z0 + dz * t);
+        if (r <= 0) {
+          setVoxel(cx, cy, cz, id);
+        } else {
+          const ri = Math.ceil(r);
+          const r2 = r * r;
+          for (let oy = -ri; oy <= ri; oy++) {
+            for (let oz = -ri; oz <= ri; oz++) {
+              for (let ox = -ri; ox <= ri; ox++) {
+                if (ox * ox + oy * oy + oz * oz <= r2) {
+                  setVoxel(cx + ox, cy + oy, cz + oz, id);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 青铜表面着色器（模拟古铜筋条、斑驳铜锈与暗金高光）
+    function pickBronzeMat(x, y, z, isRidge = false, isCrevice = false) {
+      const n = noise3(x * 0.13, y * 0.11, z * 0.13);
+      if (isCrevice && n > 0.44) return MAT.BRONZE_VERDIGRIS;
+      if (isRidge && n > 0.56) return MAT.BRONZE_GOLD;
+      if (n > 0.77) return MAT.BRONZE_VERDIGRIS;
+      if (n < 0.34) return MAT.BRONZE_DARK;
+      return MAT.BRONZE_MID;
+    }
+
+    // 树冠避让圆柱区（保证石城与高塔通透可见，绝不被树叶盖死）
+    const canopyExclusions = [];
+    function addCanopyExclusion(x, yMin, yMax, z, radius) {
+      canopyExclusions.push({ x, yMin, yMax, z, r2: radius * radius });
+    }
+    function isInsideExclusion(x, y, z) {
+      for (let i = 0; i < canopyExclusions.length; i++) {
+        const ex = canopyExclusions[i];
+        if (y >= ex.yMin && y <= ex.yMax) {
+          const dx = x - ex.x, dz = z - ex.z;
+          if (dx * dx + dz * dz <= ex.r2) return true;
+        }
+      }
+      return false;
+    }
+
+    // =========================================================================
+    // 模块 2：200 格高青铜巨树结构（盘根基座 / 主干 / 两层主枝与次枝 / 青铜树冠）
+    // =========================================================================
+
+    // 主树干 3D 样条曲线（Y = 0 ~ 132）
+    const trunkCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(1.6, 26, -1.2),
+      new THREE.Vector3(-2.6, 56, 2.2),
+      new THREE.Vector3(2.2, 88, -1.6),
+      new THREE.Vector3(-0.6, 114, 0.8),
+      new THREE.Vector3(0, 132, 0)
+    ]);
+
+    // 预采样主树干每一高度层的中心坐标与实时半径
+    const trunkCenterX = new Float32Array(140);
+    const trunkCenterZ = new Float32Array(140);
+    const trunkRadiusArr = new Float32Array(140);
+
+    function precomputeTrunk() {
+      const samples = trunkCurve.getSpacedPoints(260);
+      for (let y = 0; y < 140; y++) {
+        // 查找最接近 y 的样条采样点
+        let best = samples[0], bestDist = 999;
+        for (let i = 0; i < samples.length; i++) {
+          const d = Math.abs(samples[i].y - y);
+          if (d < bestDist) { bestDist = d; best = samples[i]; }
+        }
+        trunkCenterX[y] = best.x;
+        trunkCenterZ[y] = best.z;
+
+        // 主干半径剖面：底部膨大至 ~19，中下 16 收窄至中上 10.5，顶部树心分叉处微扩至 13.2
+        let r;
+        if (y < 24) {
+          const t = y / 24;
+          r = 19.5 - 3.5 * Math.pow(t, 0.75);
+        } else if (y < 95) {
+          const t = (y - 24) / 71;
+          r = 16.0 - 5.6 * t;
+        } else {
+          const t = Math.min(1, (y - 95) / 35);
+          r = 10.4 + 3.2 * Math.sin(t * Math.PI * 0.5);
+        }
+        trunkRadiusArr[y] = r;
+      }
+    }
+
+    function getTrunkX(y) { return trunkCenterX[Math.max(0, Math.min(139, y | 0))]; }
+    function getTrunkZ(y) { return trunkCenterZ[Math.max(0, Math.min(139, y | 0))]; }
+    function getTrunkR(y) { return trunkRadiusArr[Math.max(0, Math.min(139, y | 0))]; }
+
+    // 2.1 底部厚实岩土与青铜地基平台（Y = 0 ~ 6，半径约 52 格，零悬空）
+    function buildGroundPlatform() {
+      const maxR = 52;
+      for (let z = -maxR - 2; z <= maxR + 2; z++) {
+        for (let x = -maxR - 2; x <= maxR + 2; x++) {
+          const dist = Math.hypot(x, z);
+          const angle = Math.atan2(z, x);
+          const edgeNoise = (noise3(x * 0.08, 0, z * 0.08) - 0.5) * 3.2;
+          const rEff = dist + edgeNoise;
+
+          if (rEff > maxR) continue;
+
+          // 分阶梯层高：中心广场 Y=5，外环逐级跌落至地面 Y=0
+          let topY = 5;
+          if (rEff > 49) topY = 1;
+          else if (rEff > 46) topY = 3;
+          else if (rEff > 43) topY = 4;
+
+          // 入口正向（+Z） ceremonial 阶梯坡道
+          if (z > 36 && Math.abs(x) <= 9) {
+            if (z > 49) topY = 1;
+            else if (z > 46) topY = 2;
+            else if (z > 43) topY = 3;
+            else if (z > 40) topY = 4;
+            else topY = 5;
+          }
+
+          for (let y = 0; y <= topY; y++) {
+            let mat = MAT.EARTH_ROCK;
+            if (y === topY) {
+              // 广场顶面铺设浅石砖 + 同心青铜镶边 + 放射青铜纹理
+              const isRing = (Math.abs(dist - 42) < 1.2) || (Math.abs(dist - 30) < 1.0) || (Math.abs(dist - 22) < 0.9);
+              const isSpoke = Math.abs(Math.sin(angle * 4)) < 0.045 && dist > 18 && dist < 43;
+              if (rEff > 44.5) {
+                mat = (y >= 3) ? MAT.STONE_DARK : MAT.EARTH_ROCK;
+              } else if (isRing || isSpoke) {
+                mat = (hash3(x, y, z) > 0.72) ? MAT.BRONZE_VERDIGRIS : MAT.BRONZE_GOLD;
+              } else if (z > 20 && Math.abs(x) <= 7) {
+                // 正门礼仪大道
+                mat = (Math.abs(x) === 7) ? MAT.BRONZE_MID : ((x + z) & 1 ? MAT.STONE_CREAM : MAT.STONE_LIGHT);
+              } else {
+                const checker = ((Math.floor(x / 3) + Math.floor(z / 3)) & 1) === 0;
+                mat = checker ? MAT.STONE_WEATHER : MAT.STONE_DARK;
+              }
+            } else if (y >= topY - 1 && rEff > 41) {
+              mat = MAT.STONE_DARK;
+            }
+            setVoxel(x, y, z, mat);
+          }
+        }
+      }
+
+      // 地面入口广场礼仪灯柱（沿 +Z 入口大道两侧及广场边缘）
+      const pillarAngles = [];
+      for (let i = 0; i < 12; i++) pillarAngles.push((i / 12) * Math.PI * 2);
+      for (const ang of pillarAngles) {
+        const px = Math.round(Math.cos(ang) * 42);
+        const pz = Math.round(Math.sin(ang) * 42);
+        if (pz > 34 && Math.abs(px) < 11) continue; // 留出主入口通道
+        for (let y = 6; y <= 9; y++) setVoxel(px, y, pz, y === 9 ? MAT.BRONZE_GOLD : MAT.BRONZE_MID);
+        setVoxel(px, 10, pz, MAT.LIGHT_LANTERN);
+        setVoxel(px, 11, pz, MAT.BRONZE_DARK);
+      }
+
+      // 正门双青铜守门灯塔柱
+      for (const sx of [-9, 9]) {
+        for (const sz of [36, 44]) {
+          fillBox(sx - 1, 5, sz - 1, sx + 1, 7, sz + 1, MAT.STONE_DARK);
+          for (let y = 8; y <= 13; y++) setVoxel(sx, y, sz, y % 2 === 0 ? MAT.BRONZE_GOLD : MAT.BRONZE_MID);
+          setVoxel(sx, 14, sz, MAT.LIGHT_LANTERN);
+          setVoxel(sx, 15, sz, MAT.BRONZE_GOLD);
+        }
+      }
+    }
+
+    // 2.2 铸造青铜主树干（Y = 4 ~ 131，雕刻纵向筋条、铸造箍环与铜绿沟槽）
+    function buildMainTrunk() {
+      const ringHeights = [24, 48, 72, 96, 118];
+
+      for (let y = 4; y <= 131; y++) {
+        const cx = getTrunkX(y);
+        const cz = getTrunkZ(y);
+        const baseR = getTrunkR(y);
+
+        // 判断是否处于环状铸造箍环高度
+        let ringBoost = 0;
+        let isRingBand = false;
+        for (const rh of ringHeights) {
+          const dy = Math.abs(y - rh);
+          if (dy <= 1) { ringBoost = 1.25; isRingBand = true; }
+          else if (dy === 2) { ringBoost = 0.55; }
+        }
+
+        const bound = Math.ceil(baseR + 4);
+        for (let dz = -bound; dz <= bound; dz++) {
+          for (let dx = -bound; dx <= bound; dx++) {
+            const wx = Math.round(cx + dx);
+            const wz = Math.round(cz + dz);
+            const dist = Math.hypot(wx - cx, wz - cz);
+            const ang = Math.atan2(wz - cz, wx - cx);
+
+            // 12 条略带螺旋扭转张力的青铜筋条纹路
+            const flute = Math.cos(ang * 12 + y * 0.042);
+            const subFlute = Math.cos(ang * 6 - y * 0.025) * 0.45;
+            const localR = baseR + flute * 1.15 + subFlute + ringBoost;
+
+            if (dist <= localR) {
+              let mat = MAT.BRONZE_DARK;
+              if (dist > localR - 1.65) {
+                if (isRingBand) {
+                  const rivet = Math.abs(Math.sin(ang * 18)) > 0.85 && (y % 2 === 0);
+                  mat = rivet ? MAT.BRONZE_GOLD : (Math.abs(flute) < 0.2 ? MAT.BRONZE_VERDIGRIS : MAT.BRONZE_GOLD);
+                } else {
+                  const isRidge = flute > 0.45;
+                  const isCrevice = flute < -0.42;
+                  mat = pickBronzeMat(wx, y, wz, isRidge, isCrevice);
+                }
+              }
+              setVoxel(wx, y, wz, mat);
+            }
+          }
+        }
+      }
+    }
+
+    // 2.3 巨型盘根（7 条拱形扭曲铸造青铜树根，Y = 0 ~ 38，围合出地面入口广场）
+    function buildGiantRoots() {
+      // 7 条主根角度分布（刻意在 +Z 正门方向 90° 两侧留出宏伟拱门广场）
+      const rootAnglesDeg = [18, 62, 118, 165, 215, 270, 324];
+
+      for (let i = 0; i < rootAnglesDeg.length; i++) {
+        const a0 = THREE.MathUtils.degToRad(rootAnglesDeg[i]);
+        const twist = (i % 2 === 0 ? 1 : -1) * 0.18;
+        const startY = 30 + (i % 3) * 3.5;
+        const cx0 = getTrunkX(startY), cz0 = getTrunkZ(startY);
+
+        const p0 = new THREE.Vector3(cx0 + Math.cos(a0) * 11, startY, cz0 + Math.sin(a0) * 11);
+        const p1 = new THREE.Vector3(Math.cos(a0 + twist * 0.5) * 23, 21 + (i % 2) * 3, Math.sin(a0 + twist * 0.5) * 23);
+        const p2 = new THREE.Vector3(Math.cos(a0 + twist) * 34, 12, Math.sin(a0 + twist) * 34);
+        const p3 = new THREE.Vector3(Math.cos(a0 + twist * 0.7) * 43, 3, Math.sin(a0 + twist * 0.7) * 43);
+        const p4 = new THREE.Vector3(Math.cos(a0 + twist * 0.5) * 48, 0, Math.sin(a0 + twist * 0.5) * 48);
+
+        const curve = new THREE.CatmullRomCurve3([p0, p1, p2, p3, p4]);
+        rasterizeBronzeLimb(curve, 6.2, 2.8, 100, true);
+
+        // 地面根爪分叉（扎入岩土地基）
+        for (const side of [-1, 1]) {
+          const clawA = a0 + twist * 0.8 + side * 0.28;
+          const cp0 = curve.getPoint(0.68);
+          const cp1 = new THREE.Vector3(Math.cos(clawA) * 42, 6, Math.sin(clawA) * 42);
+          const cp2 = new THREE.Vector3(Math.cos(clawA) * 49, 1, Math.sin(clawA) * 49);
+          const clawCurve = new THREE.CatmullRomCurve3([cp0, cp1, cp2]);
+          rasterizeBronzeLimb(clawCurve, 3.0, 1.5, 40, true);
+        }
+      }
+    }
+
+    // 通用青铜树枝/树根体素光栅化函数（带纵向凹槽筋条与铜锈）
+    function rasterizeBronzeLimb(curve, rStart, rEnd, steps, isRoot = false) {
+      const pts = curve.getSpacedPoints(steps);
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const p = pts[i];
+        const r = rStart + (rEnd - rStart) * Math.pow(t, 0.82);
+        const ri = Math.ceil(r + 1);
+        const px = Math.round(p.x), py = Math.round(p.y), pz = Math.round(p.z);
+
+        for (let oy = -ri; oy <= ri; oy++) {
+          for (let oz = -ri; oz <= ri; oz++) {
+            for (let ox = -ri; ox <= ri; ox++) {
+              const d = Math.hypot(ox, oy, oz);
+              const ang = Math.atan2(oz, ox);
+              const groove = Math.cos(ang * 5 + t * 10) * (r > 3 ? 0.5 : 0.2);
+              const rEff = r + groove;
+              if (d <= rEff) {
+                let mat = MAT.BRONZE_DARK;
+                if (d > rEff - 1.35) {
+                  // 树根与枝背朝上面更容易积聚氧化铜绿
+                  const topPatina = oy > r * 0.45 && noise3((px + ox) * 0.16, (py + oy) * 0.16, (pz + oz) * 0.16) > 0.56;
+                  if (topPatina) mat = MAT.BRONZE_VERDIGRIS;
+                  else mat = pickBronzeMat(px + ox, py + oy, pz + oz, groove > 0.25, groove < -0.2);
+                }
+                const wy = py + oy;
+                if (wy >= 0 && (!isRoot || wy >= 0)) {
+                  setVoxel(px + ox, wy, pz + oz, mat);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 平台锚点总表（建筑区、桥梁、升降井共用坐标）
+    const PLATFORMS = {};
+    const canopyClusters = []; // 枝梢树冠聚类坐标
+
+    // 2.4 两层向上分裂的巨型枝干与次级枝桠（Y = 90 ~ 196）
+    function buildBranchNetwork() {
+      // 树心枢纽平台注册（坐落主干分叉中心）
+      PLATFORMS.HUB = { id: 'HUB', x: 0, y: 130, z: 0, radius: 17, type: 'hub', tier: 'center' };
+      addCanopyExclusion(0, 126, 166, 0, 22);
+
+      // 8 条主青铜树枝配置（下层 4 枝 + 上层 4 枝）
+      const branchDefs = [
+        // 下层 4 条宽阔主枝（Y = 92 ~ 100 起分叉）
+        {
+          id: 'L0_FORGE', tier: 'lower', type: 'forge', deg: 20,
+          startY: 95, platR: 40, platY: 118, platSize: 13,
+          tipR: 68, tipY: 170, startRadius: 6.0, midRadius: 4.5
+        },
+        {
+          id: 'L1_RES_A', tier: 'lower', type: 'res', deg: 112,
+          startY: 92, platR: 38, platY: 114, platSize: 12,
+          tipR: 66, tipY: 166, startRadius: 5.8, midRadius: 4.4
+        },
+        {
+          id: 'L2_RES_B', tier: 'lower', type: 'res', deg: 204,
+          startY: 97, platR: 39, platY: 124, platSize: 12,
+          tipR: 68, tipY: 174, startRadius: 5.8, midRadius: 4.4
+        },
+        {
+          id: 'L3_HALL', tier: 'lower', type: 'hall', deg: 294,
+          startY: 99, platR: 38, platY: 126, platSize: 13,
+          tipR: 67, tipY: 176, startRadius: 6.2, midRadius: 4.6
+        },
+
+        // 上层 4 条高耸主枝（Y = 116 ~ 122 起分叉）
+        {
+          id: 'U0_RES_C', tier: 'upper', type: 'res', deg: 64,
+          startY: 117, platR: 34, platY: 146, platSize: 10,
+          tipR: 58, tipY: 186, startRadius: 5.0, midRadius: 3.6
+        },
+        {
+          id: 'U1_OBS', tier: 'upper', type: 'observatory', deg: 158,
+          startY: 119, platR: 34, platY: 155, platSize: 10,
+          tipR: 58, tipY: 184, startRadius: 5.0, midRadius: 3.6
+        },
+        {
+          id: 'U2_RES_D', tier: 'upper', type: 'res', deg: 248,
+          startY: 116, platR: 35, platY: 150, platSize: 10,
+          tipR: 59, tipY: 188, startRadius: 5.0, midRadius: 3.6
+        },
+        {
+          id: 'U3_TERRACE', tier: 'upper', type: 'terrace', deg: 342,
+          startY: 120, platR: 33, platY: 148, platSize: 9,
+          tipR: 56, tipY: 188, startRadius: 4.9, midRadius: 3.5
+        }
+      ];
+
+      for (const b of branchDefs) {
+        const rad = THREE.MathUtils.degToRad(b.deg);
+        const sx = getTrunkX(b.startY) + Math.cos(rad) * (getTrunkR(b.startY) - 3);
+        const sz = getTrunkZ(b.startY) + Math.sin(rad) * (getTrunkR(b.startY) - 3);
+
+        // 平台节点中心坐落在主枝宽阔枝背上
+        const px = Math.round(Math.cos(rad) * b.platR);
+        const pz = Math.round(Math.sin(rad) * b.platR);
+        const py = b.platY;
+
+        PLATFORMS[b.id] = {
+          id: b.id, x: px, y: py, z: pz,
+          radius: b.platSize, type: b.type, tier: b.tier, deg: b.deg,
+          portals: [] // 记录桥口接入方向，避免房屋挡路
+        };
+
+        // 注册树冠避让空间（观星塔一直留空至 Y=195，确保星环纤毫毕现）
+        const clearTop = (b.type === 'observatory') ? 198 : (py + 28);
+        const clearRad = (b.type === 'observatory') ? 14 : (b.platSize + 5);
+        addCanopyExclusion(px, py - 2, clearTop, pz, clearRad);
+
+        // 主枝干从树干出发，托住平台底部（py - 4），再向外斜上方扬起至枝梢
+        const midX = Math.cos(rad) * (b.platR * 0.52);
+        const midZ = Math.sin(rad) * (b.platR * 0.52);
+        const midY = (b.startY + py - 4) * 0.5 + 1.5;
+
+        const outX = Math.cos(rad) * (b.platR + 14);
+        const outZ = Math.sin(rad) * (b.platR + 14);
+        const outY = py + 8;
+
+        const tipX = Math.cos(rad) * b.tipR;
+        const tipZ = Math.sin(rad) * b.tipR;
+
+        const mainCurve = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(sx, b.startY, sz),
+          new THREE.Vector3(midX, midY, midZ),
+          new THREE.Vector3(px, py - 5, pz),
+          new THREE.Vector3(outX, outY, outZ),
+          new THREE.Vector3(tipX, b.tipY, tipZ)
+        ]);
+        rasterizeBronzeLimb(mainCurve, b.startRadius, 1.7, 90);
+
+        // 记录主枝梢树冠簇
+        canopyClusters.push({ x: tipX, y: b.tipY + 1, z: tipZ, rx: 11, ry: 4.2, rz: 11 });
+
+        // 左右次级分叉枝桠（从平台外侧分叉舒展，撑开宏大通透的青铜树冠）
+        for (const side of [-1, 1]) {
+          const subRad = rad + side * 0.36;
+          const forkPt = mainCurve.getPoint(0.62);
+          const sMidR = b.platR + 18;
+          const sTipR = b.tipR - 2 + (side > 0 ? 5 : -3);
+          const sTipY = Math.min(194, b.tipY + (side > 0 ? 8 : -5));
+
+          const subCurve = new THREE.CatmullRomCurve3([
+            forkPt.clone(),
+            new THREE.Vector3(Math.cos(subRad) * sMidR, forkPt.y + 12, Math.sin(subRad) * sMidR),
+            new THREE.Vector3(Math.cos(subRad + side * 0.1) * sTipR, sTipY, Math.sin(subRad + side * 0.1) * sTipR)
+          ]);
+          rasterizeBronzeLimb(subCurve, 3.0, 1.3, 50);
+
+          const st = subCurve.getPoint(1);
+          canopyClusters.push({ x: st.x, y: st.y + 1, z: st.z, rx: 9.5, ry: 3.6, rz: 9.5 });
+
+          // 向上攀升的高位分枝（丰富 Y = 175 ~ 196 树冠轮廓）
+          if (b.tier === 'upper' || side > 0) {
+            const hiRad = rad + side * 0.18;
+            const hiStart = mainCurve.getPoint(0.75);
+            const hiTipR = Math.max(24, b.tipR - 18);
+            const hiTipY = Math.min(196, (b.tier === 'upper' ? 194 : 185));
+            const hiCurve = new THREE.CatmullRomCurve3([
+              hiStart.clone(),
+              new THREE.Vector3(Math.cos(hiRad) * (hiTipR + 8), (hiStart.y + hiTipY) * 0.5 + 3, Math.sin(hiRad) * (hiTipR + 8)),
+              new THREE.Vector3(Math.cos(hiRad) * hiTipR, hiTipY, Math.sin(hiRad) * hiTipR)
+            ]);
+            rasterizeBronzeLimb(hiCurve, 2.3, 1.1, 42);
+            const ht = hiCurve.getPoint(1);
+            canopyClusters.push({ x: ht.x, y: ht.y + 1, z: ht.z, rx: 9.0, ry: 3.5, rz: 9.0 });
+          }
+        }
+      }
+
+      // 4 条中央穹顶华盖青铜巨枝（绕过树心广场外缘，高高拱起至 Y = 197，撑起 Y = 200 精准树冠顶点）
+      const crownAngles = [38, 130, 222, 316];
+      for (let i = 0; i < crownAngles.length; i++) {
+        const rad = THREE.MathUtils.degToRad(crownAngles[i]);
+        const cCurve = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(Math.cos(rad) * 12, 123, Math.sin(rad) * 12),
+          new THREE.Vector3(Math.cos(rad) * 23, 146, Math.sin(rad) * 23),
+          new THREE.Vector3(Math.cos(rad + 0.12) * 22, 172, Math.sin(rad + 0.12) * 22),
+          new THREE.Vector3(Math.cos(rad + 0.2) * 11, 191, Math.sin(rad + 0.2) * 11),
+          new THREE.Vector3(Math.cos(rad) * 3, 196, Math.sin(rad) * 3)
+        ]);
+        rasterizeBronzeLimb(cCurve, 4.0, 1.5, 75);
+
+        const midCrown = cCurve.getPoint(0.76);
+        canopyClusters.push({ x: midCrown.x, y: midCrown.y + 2, z: midCrown.z, rx: 10.5, ry: 3.6, rz: 10.5 });
+      }
+
+      // 最高冠顶层叠青铜华盖（精确落在 Y = 200）
+      canopyClusters.push({ x: 0, y: 196.5, z: 0, rx: 14, ry: 3.6, rz: 14, isApex: true });
+      canopyClusters.push({ x: 7, y: 193, z: -6, rx: 10, ry: 3.2, rz: 10 });
+      canopyClusters.push({ x: -8, y: 192, z: 7, rx: 10, ry: 3.2, rz: 10 });
+    }
+
+    // 2.5 雕塑感层叠青铜叶片簇与氧化铜绿叶冠（Y = 155 ~ 200，通透留白不遮死建筑）
+    function buildBronzeCanopy() {
+      for (const cl of canopyClusters) {
+        // 每个聚类由 2 层错叠的扁平浮雕铜叶盘构成（古松/青铜雕塑云团感）
+        const tiers = cl.isApex
+          ? [
+              { dx: 0, dy: -2, dz: 0, sx: 1.15, sy: 0.85, sz: 1.15 },
+              { dx: 0, dy: 0.5, dz: 0, sx: 0.78, sy: 0.95, sz: 0.78 }
+            ]
+          : [
+              { dx: 0, dy: 0, dz: 0, sx: 1.0, sy: 1.0, sz: 1.0 },
+              { dx: (hash3(cl.x | 0, cl.y | 0, cl.z | 0) - 0.5) * 4, dy: 2.3, dz: (hash3(cl.z | 0, cl.x | 0, cl.y | 0) - 0.5) * 4, sx: 0.65, sy: 0.8, sz: 0.65 }
+            ];
+
+        for (const t of tiers) {
+          const cx = cl.x + t.dx, cy = cl.y + t.dy, cz = cl.z + t.dz;
+          const rx = cl.rx * t.sx, ry = cl.ry * t.sy, rz = cl.rz * t.sz;
+          const irx = Math.ceil(rx + 1), iry = Math.ceil(ry + 1), irz = Math.ceil(rz + 1);
+
+          for (let oy = -iry; oy <= iry; oy++) {
+            const wy = Math.round(cy + oy);
+            if (wy < 153 || wy > 200) continue; // 严格控制叶冠上限精确在 Y = 200
+
+            for (let oz = -irz; oz <= irz; oz++) {
+              const wz = Math.round(cz + oz);
+              for (let ox = -irx; ox <= irx; ox++) {
+                const wx = Math.round(cx + ox);
+
+                // 跳过建筑避让区，确保石城和观星高塔通透明亮
+                if (isInsideExclusion(wx, wy, wz)) continue;
+
+                // 扁平微拱雕塑叶盘公式：底部较平，顶部微穹，边缘带叶瓣波浪
+                const ang = Math.atan2(oz, ox);
+                const lobe = 1.0 + 0.16 * Math.cos(ang * 5 + (cx + cz) * 0.1);
+                const nx = ox / (rx * lobe);
+                const nz = oz / (rz * lobe);
+                const ny = oy / ry;
+
+                // 下半扁平，上半略隆
+                const shapeDist = nx * nx + nz * nz + (oy < 0 ? ny * ny * 2.1 : ny * ny * 1.15);
+                if (shapeDist > 1.0) continue;
+
+                // 保留镂空雕刻透气感（边缘与局部孔隙）
+                const n = noise3(wx * 0.24, wy * 0.32, wz * 0.24);
+                if (shapeDist > 0.68 && n < 0.44) continue;
+                if (shapeDist > 0.32 && n < 0.24) continue;
+
+                // 分层金属叶色：底面深绿铜、中部氧化铜绿、向阳叶梢泛暗金古铜光
+                let mat;
+                if (oy <= -ry * 0.35) {
+                  mat = MAT.BRONZE_LEAF_DARK;
+                } else if (oy >= ry * 0.25 && (shapeDist > 0.48 || n > 0.66)) {
+                  mat = (n > 0.72) ? MAT.BRONZE_LEAF_GOLD : MAT.BRONZE_LEAF_MID;
+                } else {
+                  mat = (n > 0.52) ? MAT.BRONZE_LEAF_MID : MAT.BRONZE_LEAF_DARK;
+                }
+                setVoxelIfAir(wx, wy, wz, mat);
+              }
+            }
+          }
+        }
+      }
+
+      // 最高冠顶铸造青铜宝顶微饰（精准封顶 Y = 200）
+      setVoxel(0, 199, 0, MAT.BRONZE_GOLD);
+      setVoxel(0, 200, 0, MAT.BRONZE_LEAF_GOLD);
+    }
+
+    // =========================================================================
+    // 模块 3：贴合树干实时半径的参数化螺旋上升阶梯（Y = 5 ~ 130）
+    // =========================================================================
+
+    const stairLandings = []; // 记录每隔 ~30 格的观景平台坐标
+
+    function buildSpiralStaircase() {
+      const yStart = 5;
+      const yEnd = 130;
+      const totalTurns = 3.25;
+      const thetaStart = Math.PI * 0.5; // 从 +Z 地面入口广场起步
+      const landingHeights = [35, 65, 95, 124];
+      const landingRecorded = new Set();
+
+      const steps = 950;
+      let lastBracketDeg = -999;
+      let lastLampDeg = -999;
+
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const yf = yStart + (yEnd - yStart) * t;
+        const y = Math.round(yf);
+        const theta = thetaStart + totalTurns * Math.PI * 2 * t;
+        const degTotal = (theta - thetaStart) * (180 / Math.PI);
+
+        const cx = getTrunkX(y);
+        const cz = getTrunkZ(y);
+        const trunkR = getTrunkR(y) + 1.0;
+
+        // 检查是否接近每隔 30 格的环形休息观景平台
+        let landingExtra = 0;
+        for (const lh of landingHeights) {
+          const dy = Math.abs(yf - lh);
+          if (dy < 3.2) {
+            const factor = Math.cos((dy / 3.2) * Math.PI * 0.5);
+            landingExtra = Math.max(landingExtra, 4.8 * factor);
+            if (dy < 0.35 && !landingRecorded.has(lh)) {
+              landingRecorded.add(lh);
+              const lr = trunkR + 4.5 + 3.0;
+              stairLandings.push({
+                y: lh,
+                theta,
+                x: Math.round(cx + Math.cos(theta) * lr),
+                z: Math.round(cz + Math.sin(theta) * lr),
+                outerR: trunkR + 4.5 + 4.8
+              });
+            }
+          }
+        }
+
+        const stairWidth = 4.6 + landingExtra;
+        const rInner = trunkR - 1.4; // 向内咬合树干，严丝合缝零悬空
+        const rOuter = trunkR + stairWidth;
+        const cosT = Math.cos(theta);
+        const sinT = Math.sin(theta);
+
+        // 先净空上方行走空间（只净空树干外部的阶梯廊道）
+        for (let r = trunkR + 0.3; r <= rOuter - 0.5; r += 0.65) {
+          const wx = Math.round(cx + cosT * r);
+          const wz = Math.round(cz + sinT * r);
+          for (let h = 1; h <= 4; h++) {
+            const cur = getVoxel(wx, y + h, wz);
+            if (cur !== MAT.STONE_CREAM && cur !== MAT.LIGHT_LANTERN) {
+              setVoxel(wx, y + h, wz, MAT.AIR);
+            }
+          }
+        }
+
+        // 铺设石阶踏面与承重青铜底板
+        for (let r = rInner; r <= rOuter; r += 0.55) {
+          const wx = Math.round(cx + cosT * r);
+          const wz = Math.round(cz + sinT * r);
+          const isEdge = r >= rOuter - 0.9;
+
+          // 承重底托（2 格厚）
+          setVoxel(wx, y - 2, wz, isEdge ? MAT.BRONZE_DARK : MAT.BRONZE_MID);
+          setVoxel(wx, y - 1, wz, isEdge ? MAT.BRONZE_GOLD : MAT.STONE_DARK);
+
+          // 顶面阶梯与观景台纹理
+          let treadMat = isEdge ? MAT.BRONZE_GOLD : ((Math.floor(r) + y) % 2 === 0 ? MAT.STONE_CREAM : MAT.STONE_LIGHT);
+          if (landingExtra > 2.5 && Math.abs(r - (trunkR + 4.5)) < 0.7) treadMat = MAT.BRONZE_GOLD;
+          setVoxel(wx, y, wz, treadMat);
+        }
+
+        // 外侧矮护栏与垛口
+        const railX = Math.round(cx + cosT * rOuter);
+        const railZ = Math.round(cz + sinT * rOuter);
+        setVoxel(railX, y + 1, railZ, MAT.STONE_LIGHT);
+        if (Math.floor(degTotal / 4.5) % 2 === 0) {
+          setVoxel(railX, y + 2, railZ, MAT.BRONZE_GOLD);
+        }
+
+        // 每隔约 16° 生成实打实的青铜弧形斜撑托架（伸入树干深处，绝不浮空）
+        const bracketInterval = landingExtra > 1.5 ? 9 : 16;
+        if (degTotal - lastBracketDeg >= bracketInterval) {
+          lastBracketDeg = degTotal;
+          const bx0 = cx + cosT * (rOuter - 0.6);
+          const bz0 = cz + sinT * (rOuter - 0.6);
+          const by0 = y - 2;
+          const bx1 = getTrunkX(Math.max(4, y - 9)) + cosT * (getTrunkR(Math.max(4, y - 9)) - 2.0);
+          const bz1 = getTrunkZ(Math.max(4, y - 9)) + sinT * (getTrunkR(Math.max(4, y - 9)) - 2.0);
+          const by1 = Math.max(4, y - 9);
+          // 弧形斜撑托架
+          const midX = (bx0 + bx1) * 0.5 - cosT * 0.9;
+          const midZ = (bz0 + bz1) * 0.5 - sinT * 0.9;
+          const midY = (by0 + by1) * 0.5 + 1.2;
+          drawVoxelLine(bx0, by0, bz0, midX, midY, midZ, MAT.BRONZE_MID, 0.7);
+          drawVoxelLine(midX, midY, midZ, bx1, by1, bz1, MAT.BRONZE_DARK, 0.85);
+          // 顶部青铜横托梁
+          drawVoxelLine(bx0, by0, bz0, cx + cosT * (trunkR - 1.5), by0, cz + sinT * (trunkR - 1.5), MAT.BRONZE_GOLD, 0.5);
+        }
+
+        // 每隔约 30° 竖立一座暖光青铜路灯
+        if (degTotal - lastLampDeg >= 30 && y < yEnd - 4) {
+          lastLampDeg = degTotal;
+          setVoxel(railX, y + 2, railZ, MAT.BRONZE_MID);
+          setVoxel(railX, y + 3, railZ, MAT.BRONZE_GOLD);
+          setVoxel(railX, y + 4, railZ, MAT.LIGHT_LANTERN);
+          setVoxel(railX, y + 5, railZ, MAT.BRONZE_DARK);
+        }
+      }
+    }
+
+    // =========================================================================
+    // 模块 4：树枝上的石制地基平台、四大石制功能区与多层石制居住区
+    // =========================================================================
+
+    // 4.1 通用石制平台与青铜斜撑+石砌拱券承托结构（零悬空核心保证）
+    function buildSupportedStonePlatform(plat, isRect = false, rectW = 20, rectD = 14) {
+      const { x: cx, y: py, z: cz, radius: rad } = plat;
+
+      // 1) 平台石砖顶面与厚实石砌下肚（倒阶梯收敛拱腹）
+      const halfX = isRect ? Math.floor(rectW / 2) : rad;
+      const halfZ = isRect ? Math.floor(rectD / 2) : rad;
+
+      // 矩形平台沿切线方向对齐（供大殿与锻造工坊使用）
+      const rot = isRect ? THREE.MathUtils.degToRad((plat.deg || 0) + 90) : 0;
+      const cosR = Math.cos(rot), sinR = Math.sin(rot);
+      const maxSpan = Math.ceil(Math.hypot(halfX, halfZ)) + 2;
+
+      for (let dz = -maxSpan; dz <= maxSpan; dz++) {
+        for (let dx = -maxSpan; dx <= maxSpan; dx++) {
+          let insideNorm;
+          if (isRect) {
+            const lx = dx * cosR + dz * sinR;
+            const lz = -dx * sinR + dz * cosR;
+            insideNorm = Math.max(Math.abs(lx) / halfX, Math.abs(lz) / halfZ);
+          } else {
+            insideNorm = Math.hypot(dx, dz) / rad;
+          }
+          if (insideNorm > 1.0) continue;
+
+          const wx = cx + dx, wz = cz + dz;
+
+          // 顶面平整铺砖
+          const isRim = insideNorm > 0.89;
+          let topMat = isRim ? MAT.STONE_CREAM : (((wx + wz) & 1) ? MAT.STONE_LIGHT : MAT.STONE_WEATHER);
+          if (!isRect && Math.abs(insideNorm - 0.65) < 0.05) topMat = MAT.BRONZE_GOLD;
+          setVoxel(wx, py, wz, topMat);
+
+          // 平台厚度与倒锥形石砌拱腹（中心厚 8~10 格咬紧树枝，边缘厚 3 格）
+          const depth = Math.max(2, Math.round(9.5 * (1 - insideNorm * insideNorm * 0.72)));
+          for (let d = 1; d <= depth; d++) {
+            // 外圈下沿雕刻石砌拱券镂空
+            const ang = Math.atan2(dz, dx);
+            const isArchCut = (insideNorm > 0.78 && d >= 3 && d <= 4 && Math.abs(Math.sin(ang * 6)) > 0.55);
+            if (isArchCut) continue;
+
+            let m = MAT.STONE_DARK;
+            if (d === 1 && isRim) m = MAT.BRONZE_GOLD;
+            else if (d === 2 && isRim) m = MAT.STONE_LIGHT;
+            else if (d >= depth - 1) m = (hash3(wx, py - d, wz) > 0.55) ? MAT.BRONZE_MID : MAT.STONE_DARK;
+            setVoxel(wx, py - d, wz, m);
+          }
+
+          // 净空平台上方初始空间，清除杂乱枝叶
+          for (let h = 1; h <= 16; h++) {
+            const cur = getVoxel(wx, py + h, wz);
+            if (cur === MAT.BRONZE_LEAF_DARK || cur === MAT.BRONZE_LEAF_MID || cur === MAT.BRONZE_LEAF_GOLD) {
+              setVoxel(wx, py + h, wz, MAT.AIR);
+            }
+          }
+        }
+      }
+
+      // 2) 底部 8 根径向粗壮铸造青铜斜撑（从平台底边斜向下扎入主枝或树干）
+      const strutCount = 8;
+      for (let i = 0; i < strutCount; i++) {
+        const a = (i / strutCount) * Math.PI * 2;
+        const rimR = (isRect ? Math.min(halfX, halfZ) : rad) * 0.88;
+        const sx = cx + Math.cos(a) * rimR;
+        const sz = cz + Math.sin(a) * rimR;
+        const sy = py - 2;
+        const ex = cx + Math.cos(a) * 1.5;
+        const ez = cz + Math.sin(a) * 1.5;
+        const ey = py - 12;
+        drawVoxelLine(sx, sy, sz, ex, ey, ez, MAT.BRONZE_MID, 0.85);
+        // 节点金铜铆环
+        setVoxel(Math.round(sx), Math.round(sy), Math.round(sz), MAT.BRONZE_GOLD);
+      }
+
+      // 若是独立枝干平台，向树干方向额外加一根厚重青铜托臂咬合来向主枝
+      if (plat.id !== 'HUB') {
+        const dirToTrunk = Math.atan2(-cz, -cx);
+        const ax0 = cx + Math.cos(dirToTrunk) * (rad * 0.7);
+        const az0 = cz + Math.sin(dirToTrunk) * (rad * 0.7);
+        const ax1 = cx + Math.cos(dirToTrunk) * (rad + 7);
+        const az1 = cz + Math.sin(dirToTrunk) * (rad + 7);
+        drawVoxelLine(ax0, py - 2, az0, ax1, py - 11, az1, MAT.BRONZE_DARK, 1.15);
+      }
+    }
+
+    // 4.2 功能区 ①：树心枢纽广场（Y = 128 ~ 142，宽阔多层圆形石砌议事祭坛）
+    function buildHeartHubPlaza() {
+      const p = PLATFORMS.HUB;
+      const py = p.y; // 130
+
+      // 底层宽阔石基与青铜托架
+      buildSupportedStonePlatform(p, false);
+
+      // 广场外圈矮石栏（留出四向辐射通道豁口）
+      for (let a = 0; a < 360; a += 2) {
+        const rad = THREE.MathUtils.degToRad(a);
+        const rx = Math.round(Math.cos(rad) * (p.radius - 0.5));
+        const rz = Math.round(Math.sin(rad) * (p.radius - 0.5));
+        // 避开各桥梁与螺旋梯出口
+        let nearGap = false;
+        for (const deg of [20, 64, 112, 204, 248, 294, 180]) {
+          let diff = Math.abs(((a - deg + 540) % 360) - 180);
+          if (diff < 12) nearGap = true;
+        }
+        if (!nearGap) {
+          setVoxel(rx, py + 1, rz, MAT.STONE_CREAM);
+          if (a % 12 === 0) setVoxel(rx, py + 2, rz, MAT.BRONZE_GOLD);
+        }
+      }
+
+      // 第二层环形石砌阶梯议事台（radius = 11, Y = 131 ~ 133）
+      for (let z = -12; z <= 12; z++) {
+        for (let x = -12; x <= 12; x++) {
+          const d = Math.hypot(x, z);
+          if (d <= 11.4) {
+            setVoxel(x, py + 1, z, d > 10.2 ? MAT.STONE_CREAM : MAT.STONE_LIGHT);
+          }
+          if (d <= 9.6) {
+            setVoxel(x, py + 2, z, d > 8.6 ? MAT.BRONZE_GOLD : MAT.STONE_CREAM);
+          }
+          if (d <= 6.2) {
+            const isPattern = Math.abs(x) <= 1 || Math.abs(z) <= 1;
+            setVoxel(x, py + 3, z, isPattern ? MAT.BRONZE_GOLD : MAT.STONE_CREAM);
+          }
+        }
+      }
+
+      // 12 根环绕石柱廊 + 顶部青铜环形冠檐（Y = 133 ~ 141，通透敞亮）
+      const colR = 9.0;
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2 + 0.15;
+        const cx = Math.round(Math.cos(a) * colR);
+        const cz = Math.round(Math.sin(a) * colR);
+        setVoxel(cx, py + 3, cz, MAT.STONE_DARK);
+        for (let y = py + 4; y <= py + 9; y++) {
+          setVoxel(cx, y, cz, y === py + 9 ? MAT.BRONZE_GOLD : MAT.STONE_CREAM);
+        }
+        if (i % 2 === 0) {
+          // 隔柱挂暖光灯笼
+          const lx = Math.round(Math.cos(a) * (colR - 1.2));
+          const lz = Math.round(Math.sin(a) * (colR - 1.2));
+          setVoxel(lx, py + 8, lz, MAT.LIGHT_LANTERN);
+        }
+      }
+
+      // 柱廊顶部的青铜石砌环梁（Y = 140 ~ 142）
+      for (let a = 0; a < 360; a += 3) {
+        const rad = THREE.MathUtils.degToRad(a);
+        for (let r = colR - 0.8; r <= colR + 0.8; r += 0.6) {
+          const rx = Math.round(Math.cos(rad) * r);
+          const rz = Math.round(Math.sin(rad) * r);
+          setVoxel(rx, py + 10, rz, MAT.STONE_LIGHT);
+          setVoxel(rx, py + 11, rz, (a % 15 === 0) ? MAT.BRONZE_VERDIGRIS : MAT.BRONZE_GOLD);
+          if (Math.abs(r - colR) < 0.45) {
+            setVoxel(rx, py + 12, rz, (a % 10 < 5) ? MAT.BRONZE_GOLD : MAT.AIR);
+          }
+        }
+      }
+
+      // 中央树心青铜星火祭坛（圣火台 + 悬立青铜小环）
+      fillBox(-2, py + 4, -2, 2, py + 5, 2, MAT.STONE_DARK);
+      fillBox(-1, py + 6, -1, 1, py + 6, 1, MAT.BRONZE_GOLD);
+      setVoxel(0, py + 7, 0, MAT.LIGHT_STAR);
+      setVoxel(0, py + 8, 0, MAT.LIGHT_STAR);
+      setVoxel(1, py + 7, 0, MAT.LIGHT_FORGE);
+      setVoxel(-1, py + 7, 0, MAT.LIGHT_FORGE);
+      setVoxel(0, py + 7, 1, MAT.LIGHT_FORGE);
+      setVoxel(0, py + 7, -1, MAT.LIGHT_FORGE);
+    }
+
+    // 4.3 功能区 ②：石制观星高塔（高层外枝 U1_OBS，Y = 155 ~ 190，带青铜星环）
+    function buildObservatoryTower() {
+      const p = PLATFORMS.U1_OBS;
+      const { x: cx, y: py, z: cz } = p;
+
+      buildSupportedStonePlatform(p, false);
+
+      // 平台石栏与入口阶梯
+      for (let a = 0; a < 360; a += 5) {
+        const rad = THREE.MathUtils.degToRad(a);
+        const rx = cx + Math.round(Math.cos(rad) * (p.radius - 0.6));
+        const rz = cz + Math.round(Math.sin(rad) * (p.radius - 0.6));
+        setVoxel(rx, py + 1, rz, MAT.STONE_CREAM);
+        if (a % 45 === 0) {
+          setVoxel(rx, py + 2, rz, MAT.BRONZE_GOLD);
+          setVoxel(rx, py + 3, rz, MAT.LIGHT_LANTERN);
+        }
+      }
+
+      // 纤细挺拔的石砌圆柱塔身（Y = 156 ~ 177）
+      const towerH = 22;
+      for (let h = 1; h <= towerH; h++) {
+        const y = py + h;
+        const rOut = h <= 4 ? 5.2 : (h <= 15 ? 4.3 : 3.9);
+        const rIn = rOut - 1.3;
+
+        for (let dz = -6; dz <= 6; dz++) {
+          for (let dx = -6; dx <= 6; dx++) {
+            const d = Math.hypot(dx, dz);
+            if (d > rOut) continue;
+            if (d < rIn && h > 1 && h < towerH) {
+              // 塔内清空留螺旋感
+              setVoxel(cx + dx, y, cz + dz, MAT.AIR);
+              continue;
+            }
+            const ang = Math.atan2(dz, dx);
+            // 纵向浅石扶壁棱线
+            const isButtress = Math.abs(Math.cos(ang * 4)) > 0.94 && h <= 16;
+            const isBand = (h === 5 || h === 12 || h === 17 || h === 21);
+
+            // 螺旋上升的凹陷暖光观星窗
+            const spiralWinAngle = (h * 0.55) % (Math.PI * 2);
+            let adiff = Math.abs(((ang - spiralWinAngle + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+            const isWindow = (h >= 6 && h <= 19 && (h % 4 === 2 || h % 4 === 3) && adiff < 0.25);
+
+            if (isWindow) {
+              setVoxel(cx + dx, y, cz + dz, d > rOut - 0.8 ? MAT.AIR : MAT.LIGHT_WINDOW);
+            } else if (isBand) {
+              setVoxel(cx + dx, y, cz + dz, MAT.BRONZE_GOLD);
+            } else if (isButtress) {
+              setVoxel(cx + dx, y, cz + dz, MAT.STONE_CREAM);
+            } else {
+              setVoxel(cx + dx, y, cz + dz, (h <= 4) ? MAT.STONE_DARK : MAT.STONE_LIGHT);
+            }
+          }
+        }
+
+        // 高空悬挑观星廊台（Y = py + 18）
+        if (h === 18) {
+          for (let dz = -6; dz <= 6; dz++) {
+            for (let dx = -6; dx <= 6; dx++) {
+              const d = Math.hypot(dx, dz);
+              if (d >= 3.6 && d <= 5.6) {
+                setVoxel(cx + dx, y, cz + dz, MAT.STONE_CREAM);
+                if (d > 4.8) {
+                  setVoxel(cx + dx, y + 1, cz + dz, MAT.BRONZE_GOLD);
+                  setVoxel(cx + dx, y - 1, cz + dz, MAT.BRONZE_MID);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // 塔顶高耸青灰瓦尖顶（Y = 178 ~ 185）
+      const roofBaseY = py + towerH + 1;
+      for (let h = 0; h <= 7; h++) {
+        const r = Math.max(0.5, 4.6 - h * 0.62);
+        for (let dz = -5; dz <= 5; dz++) {
+          for (let dx = -5; dx <= 5; dx++) {
+            const d = Math.hypot(dx, dz);
+            if (d <= r) {
+              const isRib = (Math.abs(dx) === 0 || Math.abs(dz) === 0) && d > r - 1.0;
+              setVoxel(cx + dx, roofBaseY + h, cz + dz, isRib ? MAT.BRONZE_GOLD : MAT.ROOF_SLATE);
+            }
+          }
+        }
+      }
+
+      // 塔刹青铜尖针与双层交叉青铜星环（Y = 183 ~ 192）
+      const orbY = roofBaseY + 9; // ~187
+      for (let y = roofBaseY + 6; y <= orbY + 4; y++) {
+        setVoxel(cx, y, cz, MAT.BRONZE_GOLD);
+      }
+      // 星环中央恒星灯核
+      setVoxel(cx, orbY, cz, MAT.LIGHT_STAR);
+      setVoxel(cx, orbY + 1, cz, MAT.LIGHT_STAR);
+
+      // 两道互相倾斜 35° 的立体铸造青铜浑天星环
+      const ringR = 5.2;
+      for (let a = 0; a < 360; a += 6) {
+        const rad = THREE.MathUtils.degToRad(a);
+        const c = Math.cos(rad) * ringR;
+        const s = Math.sin(rad) * ringR;
+
+        // 星环 1（绕 X 倾角）
+        const x1 = cx + Math.round(c);
+        const y1 = orbY + Math.round(s * 0.82);
+        const z1 = cz + Math.round(s * 0.57);
+        setVoxel(x1, y1, z1, a % 30 === 0 ? MAT.LIGHT_STAR : MAT.BRONZE_GOLD);
+
+        // 星环 2（垂直交叉）
+        const x2 = cx + Math.round(s * 0.57);
+        const y2 = orbY + Math.round(c * 0.85);
+        const z2 = cz + Math.round(s * 0.82);
+        setVoxel(x2, y2, z2, MAT.BRONZE_GOLD);
+      }
+      // 水平赤道小青铜环
+      for (let a = 0; a < 360; a += 10) {
+        const rad = THREE.MathUtils.degToRad(a);
+        setVoxel(cx + Math.round(Math.cos(rad) * 3.8), orbY, cz + Math.round(Math.sin(rad) * 3.8), MAT.BRONZE_VERDIGRIS);
+      }
+    }
+
+    // 4.4 功能区 ③：高空锻造工坊 / 风车区（中层宽枝 L0_FORGE，Y = 118 ~ 142）
+    function buildSkyForgeAndWindmill() {
+      const p = PLATFORMS.L0_FORGE;
+      const { x: cx, y: py, z: cz } = p;
+
+      buildSupportedStonePlatform(p, false);
+
+      // 1) 厚重石砌锻造主厂房（偏移中心靠北西，留出熔炉广场与起重边缘）
+      const fx0 = cx - 6, fx1 = cx + 5;
+      const fz0 = cz - 6, fz1 = cz + 4;
+      const wallH = 8;
+
+      for (let y = py + 1; y <= py + wallH; y++) {
+        for (let z = fz0; z <= fz1; z++) {
+          for (let x = fx0; x <= fx1; x++) {
+            const onBorder = (x === fx0 || x === fx1 || z === fz0 || z === fz1);
+            if (!onBorder) {
+              setVoxel(x, y, z, MAT.AIR);
+              continue;
+            }
+            const isCorner = (x === fx0 || x === fx1) && (z === fz0 || z === fz1);
+            const isBeam = (y === py + 4 || y === py + wallH);
+            let m = MAT.STONE_LIGHT;
+            if (isCorner) m = MAT.STONE_DARK;
+            else if (isBeam) m = MAT.WOOD_DARK;
+            else if (y <= py + 2) m = MAT.STONE_DARK;
+            setVoxel(x, y, z, m);
+          }
+        }
+      }
+
+      // 人字坡深灰石板瓦厂房屋顶
+      for (let step = 0; step <= 6; step++) {
+        const y = py + wallH + 1 + step;
+        const zMin = fz0 - 1 + step;
+        const zMax = fz1 + 1 - step;
+        if (zMin > zMax) break;
+        for (let x = fx0 - 1; x <= fx1 + 1; x++) {
+          setVoxel(x, y, zMin, (x === fx0 - 1 || x === fx1 + 1) ? MAT.WOOD_DARK : MAT.ROOF_SLATE);
+          setVoxel(x, y, zMax, (x === fx0 - 1 || x === fx1 + 1) ? MAT.WOOD_DARK : MAT.ROOF_SLATE);
+          // 封闭两端山墙
+          if (x === fx0 || x === fx1) {
+            for (let z = zMin + 1; z < zMax; z++) {
+              setVoxel(x, y, z, MAT.STONE_LIGHT);
+            }
+          }
+        }
+      }
+
+      // 2) 炽热橙红火光的巨型锻造熔炉口（朝 +Z 方向醒目敞开）
+      const hearthX = cx, hearthZ = fz1;
+      fillBox(hearthX - 2, py + 1, hearthZ - 2, hearthX + 2, py + 5, hearthZ + 1, MAT.STONE_DARK);
+      // 镂空炉膛填入炽烈熔岩火光体素
+      fillBox(hearthX - 1, py + 1, hearthZ - 1, hearthX + 1, py + 3, hearthZ, MAT.LIGHT_FORGE);
+      setVoxel(hearthX, py + 2, hearthZ + 1, MAT.LIGHT_FORGE);
+      setVoxel(hearthX - 1, py + 1, hearthZ + 1, MAT.LIGHT_FORGE);
+      setVoxel(hearthX + 1, py + 1, hearthZ + 1, MAT.LIGHT_FORGE);
+      // 炉顶青铜烟罩
+      fillBox(hearthX - 2, py + 4, hearthZ + 1, hearthX + 2, py + 5, hearthZ + 1, MAT.BRONZE_DARK);
+      // 铁砧与矿石堆
+      setVoxel(hearthX, py + 1, hearthZ + 4, MAT.BRONZE_CHAIN);
+      setVoxel(hearthX + 1, py + 1, hearthZ + 4, MAT.BRONZE_GOLD);
+
+      // 3) 高耸工业石砌大烟囱（直耸至 Y = py + 22 ≈ 140）
+      const chX = cx - 4, chZ = cz - 4;
+      for (let y = py + 1; y <= py + 21; y++) {
+        const r = y < py + 12 ? 2 : 1;
+        for (let dz = -r; dz <= r; dz++) {
+          for (let dx = -r; dx <= r; dx++) {
+            if (Math.abs(dx) === r && Math.abs(dz) === r && r === 2) continue;
+            const isInner = (dx === 0 && dz === 0 && y > py + 5);
+            if (isInner) {
+              setVoxel(chX + dx, y, chZ + dz, y >= py + 19 ? MAT.LIGHT_FORGE : MAT.AIR);
+            } else {
+              const isIronBand = (y === py + 14 || y === py + 18 || y === py + 21);
+              setVoxel(chX + dx, y, chZ + dz, isIronBand ? MAT.BRONZE_GOLD : (y % 2 === 0 ? MAT.STONE_DARK : MAT.STONE_WEATHER));
+            }
+          }
+        }
+      }
+
+      // 4) 探出外侧高空的风车翼片塔（坐落在厂房东侧 +X，四片大型风帆木翼）
+      const wmX = fx1 + 1, wmY = py + 8, wmZ = cz - 1;
+      // 青铜轮毂主轴朝 +X 伸出
+      drawVoxelLine(wmX - 2, wmY, wmZ, wmX + 3, wmY, wmZ, MAT.BRONZE_GOLD, 0.7);
+      const hubX = wmX + 3;
+      // 4 片 10 格长斜角风车翼片（在 YZ 平面内呈 25° 优雅风姿）
+      const bladeAngles = [25, 115, 205, 295];
+      for (const deg of bladeAngles) {
+        const rad = THREE.MathUtils.degToRad(deg);
+        const dy = Math.sin(rad), dz = Math.cos(rad);
+        const pyPerp = Math.cos(rad), pzPerp = -Math.sin(rad); // 翼面法向展开
+
+        for (let L = 1; L <= 10; L++) {
+          const by = Math.round(wmY + dy * L);
+          const bz = Math.round(wmZ + dz * L);
+          setVoxel(hubX, by, bz, MAT.WOOD_DARK); // 主木臂
+          if (L >= 3) {
+            for (let w = 1; w <= 2; w++) {
+              const sy = Math.round(wmY + dy * L + pyPerp * w);
+              const sz = Math.round(wmZ + dz * L + pzPerp * w);
+              const isFrame = (w === 2 || L === 3 || L === 6 || L === 10);
+              setVoxel(hubX, sy, sz, isFrame ? MAT.WOOD_DARK : MAT.FABRIC_SAIL);
+            }
+          }
+        }
+      }
+
+      // 5) 探出平台南东悬崖的青铜起重吊臂（悬吊着货物木箱）
+      const crX = cx + 6, crZ = cz + 7;
+      // 吊车底座与立柱
+      fillBox(crX - 1, py + 1, crZ - 1, crX + 1, py + 2, crZ + 1, MAT.STONE_DARK);
+      drawVoxelLine(crX, py + 2, crZ, crX, py + 11, crZ, MAT.BRONZE_MID, 0.6);
+      // 外伸青铜斜吊臂（探出悬崖 11 格）
+      const tipX = crX + 8, tipY = py + 16, tipZ = crZ + 7;
+      drawVoxelLine(crX, py + 4, crZ, tipX, tipY, tipZ, MAT.BRONZE_GOLD, 0.55);
+      drawVoxelLine(crX, py + 11, crZ, tipX, tipY, tipZ, MAT.BRONZE_CHAIN, 0);
+      // 垂落青铜吊链与悬空木石货箱
+      drawVoxelLine(tipX, tipY, tipZ, tipX, py + 3, tipZ, MAT.BRONZE_CHAIN, 0);
+      fillBox(tipX - 1, py, tipZ - 1, tipX + 1, py + 2, tipZ + 1, MAT.WOOD_PLANK);
+      setVoxel(tipX, py + 3, tipZ, MAT.BRONZE_GOLD);
+    }
+
+    // 4.5 功能区 ④：石制大殿 / 档案馆（中高层主枝 L3_HALL，Y = 126 ~ 146，双层拱门柱廊+宏伟人字坡顶）
+    function buildGrandStoneHall() {
+      const p = PLATFORMS.L3_HALL;
+      const { x: cx, y: py, z: cz } = p;
+
+      // 宽阔横向平台（东西向长 24，南北向宽 16）
+      buildSupportedStonePlatform(p, true, 24, 16);
+
+      // 在局部坐标系构建标准双层柱廊大殿，并旋转贴合平台切线方向
+      const rot = THREE.MathUtils.degToRad(p.deg + 90);
+      const cosR = Math.cos(rot), sinR = Math.sin(rot);
+      const putLocal = (lx, ly, lz, mat) => {
+        const wx = Math.round(cx + lx * cosR - lz * sinR);
+        const wz = Math.round(cz + lx * sinR + lz * cosR);
+        setVoxel(wx, py + ly, wz, mat);
+      };
+
+      const halfL = 10; // 总长 21 格
+      const halfW = 6;  // 总宽 13 格
+
+      // 基座石阶（2 层台阶）
+      for (let lx = -halfL - 1; lx <= halfL + 1; lx++) {
+        for (let lz = -halfW - 1; lz <= halfW + 1; lz++) {
+          putLocal(lx, 1, lz, MAT.STONE_CREAM);
+        }
+      }
+
+      // 双层主体与前后双层拱门柱廊（一层 ly=2..6, 二层 ly=7..11）
+      for (let ly = 2; ly <= 11; ly++) {
+        const isFloor2 = (ly === 7);
+        const isArchTop = (ly === 6 || ly === 11);
+
+        for (let lx = -halfL; lx <= halfL; lx++) {
+          for (let lz = -halfW; lz <= halfW; lz++) {
+            const onOuterZ = (Math.abs(lz) === halfW);
+            const onInnerWallZ = (Math.abs(lz) === halfW - 2);
+            const onEndX = (Math.abs(lx) === halfL);
+
+            // 外圈柱廊（每 4 格一根雕花石柱，柱顶形成弧形拱券）
+            if (onOuterZ) {
+              const modX = Math.abs(lx) % 4;
+              const isPillar = (modX === 2 || Math.abs(lx) === halfL);
+              const isArchShoulder = ((ly === 5 || ly === 10) && (modX === 1 || modX === 3));
+              if (isFloor2 || isArchTop) {
+                putLocal(lx, ly, lz, isFloor2 ? MAT.BRONZE_GOLD : MAT.STONE_CREAM);
+              } else if (isPillar || isArchShoulder) {
+                putLocal(lx, ly, lz, MAT.STONE_CREAM);
+              } else {
+                putLocal(lx, ly, lz, MAT.AIR);
+              }
+            }
+            // 内进深殿墙（开高大暖光拱窗，形成极佳光影进深！）
+            else if (onInnerWallZ && Math.abs(lx) <= halfL - 1) {
+              const isWin = ((Math.abs(lx) % 4 === 0) && ((ly >= 3 && ly <= 5) || (ly >= 8 && ly <= 10)));
+              putLocal(lx, ly, lz, isWin ? MAT.LIGHT_WINDOW : MAT.STONE_LIGHT);
+            }
+            // 两端山墙
+            else if (onEndX && Math.abs(lz) <= halfW - 1) {
+              const isDoor = (Math.abs(lz) <= 1 && ly >= 2 && ly <= 5);
+              const isEndWin = (Math.abs(lz) <= 1 && ly >= 8 && ly <= 10);
+              if (isDoor) putLocal(lx, ly, lz, MAT.LIGHT_WINDOW);
+              else if (isEndWin) putLocal(lx, ly, lz, MAT.LIGHT_WINDOW);
+              else putLocal(lx, ly, lz, (Math.abs(lz) === halfW - 1) ? MAT.STONE_CREAM : MAT.STONE_LIGHT);
+            }
+            // 廊道地面封板
+            else if (isFloor2 && Math.abs(lz) < halfW && Math.abs(lx) < halfL) {
+              putLocal(lx, ly, lz, MAT.STONE_DARK);
+            }
+          }
+        }
+      }
+
+      // 柱廊间点缀青铜壁灯
+      for (let lx = -8; lx <= 8; lx += 4) {
+        putLocal(lx, 5, halfW - 1, MAT.LIGHT_LANTERN);
+        putLocal(lx, 5, -halfW + 1, MAT.LIGHT_LANTERN);
+      }
+
+      // 宏伟深红瓦人字坡顶（ly = 12 ~ 19，带青铜屋脊兽饰与山花玫瑰圆窗）
+      for (let step = 0; step <= 7; step++) {
+        const ly = 12 + step;
+        const zEdge = halfW + 1 - step;
+        if (zEdge < 0) break;
+
+        for (let lx = -halfL - 1; lx <= halfL + 1; lx++) {
+          const isEave = (Math.abs(lx) === halfL + 1 || step === 0);
+          const isRidge = (zEdge === 0);
+          const rMat = isRidge ? MAT.BRONZE_GOLD : (isEave ? MAT.WOOD_DARK : MAT.ROOF_RED);
+          putLocal(lx, ly, zEdge, rMat);
+          putLocal(lx, ly, -zEdge, rMat);
+
+          // 封闭内部坡底防止透光裂缝
+          if (step > 0 && Math.abs(lx) <= halfL) {
+            putLocal(lx, ly - 1, zEdge, MAT.STONE_DARK);
+            putLocal(lx, ly - 1, -zEdge, MAT.STONE_DARK);
+          }
+
+          // 山墙三角形立面 + 玫瑰发光圆窗
+          if (Math.abs(lx) === halfL) {
+            for (let lz = -zEdge + 1; lz <= zEdge - 1; lz++) {
+              const isRose = (step >= 2 && step <= 4 && Math.abs(lz) <= 1);
+              putLocal(lx, ly, lz, isRose ? MAT.LIGHT_WINDOW : MAT.STONE_CREAM);
+            }
+          }
+        }
+      }
+      // 屋脊两端青铜鸱吻装饰
+      putLocal(-halfL, 20, 0, MAT.BRONZE_GOLD);
+      putLocal(halfL, 20, 0, MAT.BRONZE_GOLD);
+      putLocal(0, 20, 0, MAT.BRONZE_VERDIGRIS);
+    }
+
+    // 4.6 精细多层石砌民居生成器（坡屋顶、凹陷暖窗、烟囱、悬挑木阳台）
+    function buildStoneHouse(cx, baseY, cz, w, d, h, opts = {}) {
+      const roofAxis = opts.roofAxis || 'x'; // 'x' 屋脊沿 X，'z' 屋脊沿 Z
+      const roofMat = opts.roofMat || MAT.ROOF_RED;
+      const hasBalcony = !!opts.balcony;
+      const hasChimney = !!opts.chimney;
+      const halfW = Math.floor(w / 2);
+      const halfD = Math.floor(d / 2);
+
+      // 1) 向下延伸石砌基础至稳固承托层（绝不悬空）
+      for (let dz = -halfD; dz <= halfD; dz++) {
+        for (let dx = -halfW; dx <= halfW; dx++) {
+          const wx = cx + dx, wz = cz + dz;
+          for (let y = baseY; y >= baseY - 6; y--) {
+            if (getVoxel(wx, y, wz) !== MAT.AIR && y < baseY) break;
+            setVoxel(wx, y, wz, MAT.STONE_DARK);
+          }
+        }
+      }
+
+      // 2) 多层石墙 + 深色木梁框架 + 凹陷暖光窗格
+      for (let ly = 1; ly <= h; ly++) {
+        const y = baseY + ly;
+        const isTimberLevel = (ly === 4 || ly === 8 || ly === h);
+        for (let dz = -halfD; dz <= halfD; dz++) {
+          for (let dx = -halfW; dx <= halfW; dx++) {
+            const onX = (Math.abs(dx) === halfW);
+            const onZ = (Math.abs(dz) === halfD);
+            if (!onX && !onZ) {
+              setVoxel(cx + dx, y, cz + dz, MAT.AIR);
+              continue;
+            }
+            const isCorner = onX && onZ;
+            let mat = (ly <= 2) ? MAT.STONE_WEATHER : MAT.STONE_LIGHT;
+            if (isCorner) mat = MAT.STONE_CREAM;
+            else if (isTimberLevel) mat = MAT.WOOD_DARK;
+
+            // 在每层中段雕刻凹陷发光窗户
+            const winFloor = (ly === 2 || ly === 5 || ly === 6 || ly === 9);
+            const isWinPos = winFloor && !isCorner && (
+              (onZ && Math.abs(dx) % 2 === 0 && Math.abs(dx) < halfW) ||
+              (onX && Math.abs(dz) % 2 === 0 && Math.abs(dz) < halfD)
+            );
+            if (isWinPos && hash3(cx + dx, baseY, cz + dz) > 0.25) {
+              // 窗户微凹：外墙放暖光窗格或木窗台，内部背衬实墙防穿帮
+              setVoxel(cx + dx, y, cz + dz, MAT.LIGHT_WINDOW);
+            } else {
+              setVoxel(cx + dx, y, cz + dz, mat);
+            }
+          }
+        }
+      }
+
+      // 3) 悬挑木制阳台（选配）
+      if (hasBalcony && h >= 5) {
+        const by = baseY + 4;
+        const bSide = (hash3(cx, baseY, cz) > 0.5) ? 1 : -1;
+        const bz = cz + bSide * (halfD + 1);
+        for (let dx = -1; dx <= 1; dx++) {
+          setVoxel(cx + dx, by, bz, MAT.WOOD_PLANK);
+          setVoxel(cx + dx, by, bz + bSide, MAT.WOOD_PLANK);
+          setVoxel(cx + dx, by + 1, bz + bSide, MAT.WOOD_DARK);
+          setVoxel(cx + dx, by - 1, bz, MAT.BRONZE_MID); // 青铜托架
+        }
+        setVoxel(cx, by + 2, bz + bSide, MAT.LIGHT_LANTERN);
+      }
+
+      // 4) 阶梯式人字坡瓦顶（带 1 格出檐）
+      const span = (roofAxis === 'x') ? halfD : halfW;
+      for (let step = 0; step <= span + 1; step++) {
+        const y = baseY + h + 1 + step;
+        const edge = span + 1 - step;
+        if (edge < 0) break;
+
+        if (roofAxis === 'x') {
+          for (let dx = -halfW - 1; dx <= halfW + 1; dx++) {
+            const rMat = (edge === 0) ? MAT.BRONZE_MID : ((Math.abs(dx) === halfW + 1) ? MAT.WOOD_DARK : roofMat);
+            setVoxel(cx + dx, y, cz + edge, rMat);
+            setVoxel(cx + dx, y, cz - edge, rMat);
+            // 山墙封闭
+            if (Math.abs(dx) === halfW) {
+              for (let dz = -edge + 1; dz <= edge - 1; dz++) {
+                setVoxel(cx + dx, y, cz + dz, MAT.STONE_LIGHT);
+              }
+            }
+          }
+        } else {
+          for (let dz = -halfD - 1; dz <= halfD + 1; dz++) {
+            const rMat = (edge === 0) ? MAT.BRONZE_MID : ((Math.abs(dz) === halfD + 1) ? MAT.WOOD_DARK : roofMat);
+            setVoxel(cx + edge, y, cz + dz, rMat);
+            setVoxel(cx - edge, y, cz + dz, rMat);
+            if (Math.abs(dz) === halfD) {
+              for (let dx = -edge + 1; dx <= edge - 1; dx++) {
+                setVoxel(cx + dx, y, cz + dz, MAT.STONE_LIGHT);
+              }
+            }
+          }
+        }
+      }
+
+      // 5) 屋顶小石砌烟囱
+      if (hasChimney) {
+        const chX = cx + Math.max(1, halfW - 1);
+        const chZ = cz + (halfD > 1 ? 1 : 0);
+        const topY = baseY + h + span + 4;
+        for (let y = baseY + h; y <= topY; y++) {
+          setVoxel(chX, y, chZ, y === topY ? MAT.BRONZE_DARK : MAT.STONE_DARK);
+        }
+      }
+    }
+
+    // 4.7 在 4 处主枝居住区 + 1 处高空哨所平台上错落堆叠多层石砌房屋群
+    function buildResidentialDistrict(plat) {
+      buildSupportedStonePlatform(plat, false);
+      const { x: cx, y: py, z: cz, radius: rad } = plat;
+
+      // 在平台靠内侧修建抬高 2~3 格的二级错落石台，营造山城层叠感
+      const subDir = THREE.MathUtils.degToRad((plat.deg || 0) + 180); // 靠树心背坡抬高
+      const subX = cx + Math.round(Math.cos(subDir) * 3);
+      const subZ = cz + Math.round(Math.sin(subDir) * 3);
+      const subR = Math.max(4, Math.floor(rad * 0.52));
+      for (let dz = -subR; dz <= subR; dz++) {
+        for (let dx = -subR; dx <= subR; dx++) {
+          if (Math.hypot(dx, dz) <= subR) {
+            setVoxel(subX + dx, py + 1, subZ + dz, MAT.STONE_DARK);
+            setVoxel(subX + dx, py + 2, subZ + dz, MAT.STONE_CREAM);
+          }
+        }
+      }
+      // 连接上下两层的窄石阶
+      const stepDir = subDir + Math.PI;
+      for (let s = 0; s <= 2; s++) {
+        const sx = subX + Math.round(Math.cos(stepDir) * (subR - 1 + s));
+        const sz = subZ + Math.round(Math.sin(stepDir) * (subR - 1 + s));
+        fillBox(sx - 1, py + 1, sz - 1, sx + 1, py + 2 - s, sz + 1, MAT.STONE_CREAM);
+      }
+
+      // 依平台大小规划错落高低的建筑布局（避让外圈桥梁接口）
+      const roofPalette = (plat.tier === 'upper') ? [MAT.ROOF_SLATE, MAT.ROOF_RED] : [MAT.ROOF_RED, MAT.ROOF_SLATE];
+      const presets = rad >= 11
+        ? [
+            // 中高层宽平台：6 栋高低错落的多层石屋群
+            { ox: -4, oz: -4, dy: 2, w: 5, d: 5, h: 10, axis: 'x', bal: true, ch: true },
+            { ox:  3, oz: -5, dy: 2, w: 5, d: 4, h: 8,  axis: 'z', bal: false, ch: true },
+            { ox: -5, oz:  3, dy: 0, w: 5, d: 5, h: 7,  axis: 'z', bal: true, ch: false },
+            { ox:  4, oz:  3, dy: 0, w: 5, d: 4, h: 6,  axis: 'x', bal: false, ch: true },
+            { ox:  0, oz:  0, dy: 2, w: 4, d: 4, h: 12, axis: 'x', bal: true, ch: true }, // 村落高耸石钟塔楼
+            { ox:  0, oz:  6, dy: 0, w: 4, d: 3, h: 5,  axis: 'x', bal: false, ch: false }
+          ]
+        : [
+            // 高枝紧凑平台：4 栋修长挺拔的石屋
+            { ox: -3, oz: -2, dy: 2, w: 4, d: 4, h: 9,  axis: 'x', bal: true, ch: true },
+            { ox:  3, oz: -2, dy: 0, w: 4, d: 4, h: 7,  axis: 'z', bal: false, ch: true },
+            { ox: -2, oz:  3, dy: 0, w: 4, d: 3, h: 6,  axis: 'x', bal: true, ch: false },
+            { ox:  3, oz:  3, dy: 0, w: 3, d: 3, h: 10, axis: 'z', bal: false, ch: true }
+          ];
+
+      for (let i = 0; i < presets.length; i++) {
+        const hSpec = presets[i];
+        const hx = cx + hSpec.ox;
+        const hz = cz + hSpec.oz;
+        // 确认房屋落点仍在平台半径以内
+        if (Math.hypot(hSpec.ox, hSpec.oz) + Math.max(hSpec.w, hSpec.d) * 0.45 > rad + 0.5) continue;
+
+        const groundY = (getVoxel(hx, py + 2, hz) !== MAT.AIR) ? py + 2 : py;
+        buildStoneHouse(hx, groundY, hz, hSpec.w, hSpec.d, hSpec.h, {
+          roofAxis: hSpec.axis,
+          roofMat: roofPalette[i % roofPalette.length],
+          balcony: hSpec.bal,
+          chimney: hSpec.ch
+        });
+      }
+
+      // 平台边缘点缀矮石墙与暖光街灯
+      for (let a = 0; a < 360; a += 18) {
+        const r = THREE.MathUtils.degToRad(a);
+        const lx = cx + Math.round(Math.cos(r) * (rad - 0.8));
+        const lz = cz + Math.round(Math.sin(r) * (rad - 0.8));
+        if (getVoxel(lx, py + 1, lz) === MAT.AIR) {
+          setVoxel(lx, py + 1, lz, MAT.STONE_CREAM);
+          if (a % 72 === 0) {
+            setVoxel(lx, py + 2, lz, MAT.BRONZE_MID);
+            setVoxel(lx, py + 3, lz, MAT.LIGHT_LANTERN);
+          }
+        }
+      }
+    }
+
+    // =========================================================================
+    // 模块 5：区域之间的三种立体物理联通结构（拱门高架桥 / 悬垂索桥 / 青铜升降井）
+    // =========================================================================
+
+    // 计算两个平台边缘之间的精准对接起止点
+    function getPlatformEdgeAnchor(pA, pB, inset = 1.0) {
+      const dx = pB.x - pA.x;
+      const dz = pB.z - pA.z;
+      const dist = Math.hypot(dx, dz) || 1;
+      const ux = dx / dist, uz = dz / dist;
+      const rA = Math.max(2, pA.radius - inset);
+      const rB = Math.max(2, pB.radius - inset);
+      return {
+        x0: pA.x + ux * rA, y0: pA.y, z0: pA.z + uz * rA,
+        x1: pB.x - ux * rB, y1: pB.y, z1: pB.z - uz * rB,
+        ux, uz, px: -uz, pz: ux, span: Math.max(4, dist - rA - rB)
+      };
+    }
+
+    // 5.1 联通设施 ①：石砌拱门高架桥（连接树心枢纽、螺旋梯高层平台与近圈功能/居住区）
+    function buildStoneViaduct(pA, pB, archCount = 2) {
+      const seg = getPlatformEdgeAnchor(pA, pB, 1.5);
+      const steps = Math.max(12, Math.ceil(seg.span * 2.2));
+      const halfW = 1.6;
+
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const cx = seg.x0 + (seg.x1 - seg.x0) * t;
+        const cy = seg.y0 + (seg.y1 - seg.y0) * t;
+        const cz = seg.z0 + (seg.z1 - seg.z0) * t;
+        const y = Math.round(cy);
+
+        // 净空桥面通道
+        for (let w = -1; w <= 1; w++) {
+          const wx = Math.round(cx + seg.px * w);
+          const wz = Math.round(cz + seg.pz * w);
+          for (let h = 1; h <= 4; h++) setVoxel(wx, y + h, wz, MAT.AIR);
+        }
+
+        // 计算下方拱券弧度（每个跨孔呈优雅半圆石拱）
+        const archPhase = (t * archCount) % 1;
+        const archLift = Math.sin(archPhase * Math.PI); // 0 在桥墩，1 在拱顶
+        const archThickness = Math.round(1.5 + (1 - archLift) * 5.0);
+
+        for (let w = -halfW; w <= halfW; w += 0.6) {
+          const wx = Math.round(cx + seg.px * w);
+          const wz = Math.round(cz + seg.pz * w);
+          const isEdge = Math.abs(w) >= halfW - 0.5;
+
+          // 桥面铺石
+          setVoxel(wx, y, wz, isEdge ? MAT.STONE_CREAM : MAT.STONE_LIGHT);
+
+          // 桥侧石砌垛口护栏
+          if (isEdge) {
+            setVoxel(wx, y + 1, wz, MAT.STONE_LIGHT);
+            if (i % 6 < 3) setVoxel(wx, y + 2, wz, MAT.STONE_CREAM);
+          }
+
+          // 下方石砌拱腹
+          for (let d = 1; d <= archThickness; d++) {
+            const mat = (d === archThickness) ? MAT.BRONZE_GOLD : MAT.STONE_DARK;
+            setVoxel(wx, y - d, wz, mat);
+          }
+        }
+
+        // 在每个桥墩节点向下延伸石柱/青铜斜撑直至牢牢咬住下方的粗大青铜主枝（零悬空）
+        const nearPier = (archPhase < 0.08 || archPhase > 0.92) && t > 0.12 && t < 0.88;
+        if (nearPier && i % 3 === 0) {
+          const px0 = Math.round(cx), pz0 = Math.round(cz);
+          let hitSolid = false;
+          for (let drop = 5; drop <= 20; drop++) {
+            const cur = getVoxel(px0, y - drop, pz0);
+            if (cur !== MAT.AIR && drop > 6) { hitSolid = true; break; }
+            fillBox(px0 - 1, y - drop, pz0 - 1, px0 + 1, y - drop, pz0 + 1, drop % 4 === 0 ? MAT.BRONZE_MID : MAT.STONE_DARK);
+          }
+          // 若下方跨空极深，向两端平台拉青铜斜撑拱腿
+          if (!hitSolid) {
+            drawVoxelLine(px0, y - 8, pz0, seg.x0, seg.y0 - 4, seg.z0, MAT.BRONZE_MID, 0.7);
+            drawVoxelLine(px0, y - 8, pz0, seg.x1, seg.y1 - 4, seg.z1, MAT.BRONZE_MID, 0.7);
+          }
+        }
+
+        // 周期性石桥青铜暖光路灯
+        if (i > 4 && i < steps - 4 && i % 16 === 0) {
+          for (const side of [-1, 1]) {
+            const lx = Math.round(cx + seg.px * halfW * side);
+            const lz = Math.round(cz + seg.pz * halfW * side);
+            setVoxel(lx, y + 2, lz, MAT.BRONZE_MID);
+            setVoxel(lx, y + 3, lz, MAT.LIGHT_LANTERN);
+            setVoxel(lx, y + 4, lz, MAT.BRONZE_GOLD);
+          }
+        }
+      }
+    }
+
+    // 5.2 联通设施 ②：悬垂式索桥（木石桥面 + 悬链线青铜锁链护栏 + 暖光吊灯笼）
+    function buildSuspensionBridge(pA, pB, sag = 4.8) {
+      const seg = getPlatformEdgeAnchor(pA, pB, 1.2);
+      const steps = Math.max(18, Math.ceil(seg.span * 2.4));
+      const halfW = 1.4;
+      const pylonH = 6;
+
+      // 两端桥头厚重石砌青铜索塔门楼（稳稳立在平台边缘）
+      for (const end of [
+        { x: seg.x0, y: seg.y0, z: seg.z0 },
+        { x: seg.x1, y: seg.y1, z: seg.z1 }
+      ]) {
+        for (const side of [-1, 1]) {
+          const tx = Math.round(end.x + seg.px * (halfW + 0.6) * side);
+          const tz = Math.round(end.z + seg.pz * (halfW + 0.6) * side);
+          for (let h = 0; h <= pylonH; h++) {
+            setVoxel(tx, end.y + h, tz, h === pylonH ? MAT.BRONZE_GOLD : (h <= 2 ? MAT.STONE_DARK : MAT.STONE_CREAM));
+          }
+          setVoxel(tx, end.y + pylonH + 1, tz, MAT.LIGHT_LANTERN);
+        }
+        // 桥头顶部青铜过梁
+        drawVoxelLine(
+          end.x - seg.px * (halfW + 0.6), end.y + pylonH, end.z - seg.pz * (halfW + 0.6),
+          end.x + seg.px * (halfW + 0.6), end.y + pylonH, end.z + seg.pz * (halfW + 0.6),
+          MAT.BRONZE_GOLD, 0
+        );
+      }
+
+      // 沿抛物悬链线铺设木石桥面、主悬链索、竖向吊绳与挂灯
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const cx = seg.x0 + (seg.x1 - seg.x0) * t;
+        const cz = seg.z0 + (seg.z1 - seg.z0) * t;
+        const linearY = seg.y0 + (seg.y1 - seg.y0) * t;
+
+        // 悬垂弧线方程
+        const deckDrop = 4 * sag * t * (1 - t);
+        const deckY = Math.round(linearY - deckDrop);
+
+        // 主承重青铜锁链（从塔顶高悬下垂至跨中栏杆高度）
+        const cableTopY = linearY + pylonH - 4 * (sag + pylonH - 2.0) * t * (1 - t);
+        const cY = Math.round(cableTopY);
+
+        // 净空桥上行走空间
+        for (let w = -1; w <= 1; w++) {
+          const wx = Math.round(cx + seg.px * w);
+          const wz = Math.round(cz + seg.pz * w);
+          for (let h = 1; h <= 3; h++) setVoxel(wx, deckY + h, wz, MAT.AIR);
+        }
+
+        // 木石交替悬桥踏板
+        const isStoneSlat = (i % 4 === 0);
+        for (let w = -halfW; w <= halfW; w += 0.65) {
+          const wx = Math.round(cx + seg.px * w);
+          const wz = Math.round(cz + seg.pz * w);
+          setVoxel(wx, deckY, wz, isStoneSlat ? MAT.STONE_LIGHT : MAT.WOOD_PLANK);
+        }
+
+        // 两侧青铜锁链主索、护栏索与垂直吊索
+        for (const side of [-1, 1]) {
+          const rx = Math.round(cx + seg.px * (halfW + 0.5) * side);
+          const rz = Math.round(cz + seg.pz * (halfW + 0.5) * side);
+
+          // 桥底纵梁锁链 + 扶手索 + 顶部大悬索
+          setVoxel(rx, deckY, rz, MAT.BRONZE_CHAIN);
+          setVoxel(rx, deckY + 1, rz, MAT.BRONZE_CHAIN);
+          setVoxel(rx, cY, rz, MAT.BRONZE_CHAIN);
+
+          // 每隔数格拉一根垂直青铜吊绳连接大悬索与桥面
+          if (i % 7 === 0) {
+            for (let y = deckY + 1; y <= cY; y++) {
+              setVoxel(rx, y, rz, MAT.BRONZE_CHAIN);
+            }
+          }
+
+          // 间隔挂设暖光索桥灯笼
+          if (i > 5 && i < steps - 5 && i % 15 === 0) {
+            setVoxel(rx, deckY + 2, rz, MAT.BRONZE_GOLD);
+            setVoxel(rx, deckY + 3, rz, MAT.LIGHT_LANTERN);
+          }
+        }
+      }
+    }
+
+    // 5.3 联通设施 ③：垂直镂空青铜桁架升降井 / 缆车塔（带悬空木石吊篮与缆绳）
+    function buildVerticalElevatorShaft(shaftX, shaftZ, platBottom, platTop, cabinRatio = 0.48) {
+      const yBot = platBottom.y;
+      const yTop = platTop.y;
+      const half = 2; // 5×5 镂空桁架塔井
+
+      // 1) 底部与顶部稳固联络栈桥（含青铜斜撑托住井筒与栈桥，彻底杜绝悬空）
+      const buildDock = (plat, targetY) => {
+        const dx = shaftX - plat.x, dz = shaftZ - plat.z;
+        const dist = Math.hypot(dx, dz) || 1;
+        const ux = dx / dist, uz = dz / dist;
+        const px = -uz, pz = ux;
+
+        // 从平台边缘连通至升降井口
+        const startR = Math.max(2, plat.radius - 2);
+        const steps = Math.ceil(Math.max(4, dist - startR + 2) * 1.8);
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          const bx = plat.x + ux * (startR + (dist - startR) * t);
+          const bz = plat.z + uz * (startR + (dist - startR) * t);
+          for (let w = -1.2; w <= 1.2; w += 0.6) {
+            const wx = Math.round(bx + px * w);
+            const wz = Math.round(bz + pz * w);
+            setVoxel(wx, targetY, wz, MAT.WOOD_PLANK);
+            setVoxel(wx, targetY - 1, wz, MAT.BRONZE_MID);
+            for (let h = 1; h <= 4; h++) setVoxel(wx, targetY + h, wz, MAT.AIR);
+          }
+          // 栈桥两侧护栏
+          setVoxel(Math.round(bx + px * 1.4), targetY + 1, Math.round(bz + pz * 1.4), MAT.BRONZE_GOLD);
+          setVoxel(Math.round(bx - px * 1.4), targetY + 1, Math.round(bz - pz * 1.4), MAT.BRONZE_GOLD);
+        }
+
+        // 从井筒底部打两根强劲的青铜斜撑腿扎回平台下肚石基
+        drawVoxelLine(shaftX, targetY - 1, shaftZ, plat.x + ux * (plat.radius * 0.45), targetY - 9, plat.z + uz * (plat.radius * 0.45), MAT.BRONZE_MID, 0.85);
+        drawVoxelLine(shaftX + px * 2, targetY - 1, shaftZ + pz * 2, plat.x + ux * (plat.radius * 0.35), targetY - 8, plat.z + uz * (plat.radius * 0.35), MAT.BRONZE_DARK, 0.7);
+      };
+
+      buildDock(platBottom, yBot);
+      buildDock(platTop, yTop);
+
+      // 2) 底部承重基盘
+      fillBox(shaftX - half, yBot - 2, shaftZ - half, shaftX + half, yBot - 1, shaftZ + half, MAT.STONE_DARK);
+      fillBox(shaftX - half, yBot, shaftZ - half, shaftX + half, yBot, shaftZ + half, MAT.BRONZE_MID);
+
+      // 3) 垂直镂空青铜桁架塔身（yBot ~ yTop + 7）
+      const roofY = yTop + 7;
+      for (let y = yBot; y <= roofY; y++) {
+        // 清空井道内部确保极佳镂空透视感
+        fillBox(shaftX - 1, y, shaftZ - 1, shaftX + 1, y, shaftZ + 1, MAT.AIR);
+
+        // 四根垂直青铜角柱
+        for (const sx of [-half, half]) {
+          for (const sz of [-half, half]) {
+            setVoxel(shaftX + sx, y, shaftZ + sz, (y % 5 === 0) ? MAT.BRONZE_GOLD : MAT.BRONZE_MID);
+          }
+        }
+
+        // 每 6 格一圈水平加固横梁（停靠出入口层留开门洞）
+        const isDoorHeight = (y >= yBot + 1 && y <= yBot + 3) || (y >= yTop + 1 && y <= yTop + 3);
+        if (y % 6 === 0 && !isDoorHeight) {
+          for (let k = -half; k <= half; k++) {
+            setVoxel(shaftX + k, y, shaftZ - half, MAT.BRONZE_GOLD);
+            setVoxel(shaftX + k, y, shaftZ + half, MAT.BRONZE_GOLD);
+            setVoxel(shaftX - half, y, shaftZ + k, MAT.BRONZE_GOLD);
+            setVoxel(shaftX + half, y, shaftZ + k, MAT.BRONZE_GOLD);
+          }
+        }
+
+        // 四壁斜向青铜 X 交叉拉筋（避开门洞）
+        if (!isDoorHeight) {
+          const p = (y % 6) - 2; // -2..3
+          if (Math.abs(p) <= 1) {
+            setVoxel(shaftX + p, y, shaftZ - half, MAT.BRONZE_CHAIN);
+            setVoxel(shaftX - p, y, shaftZ + half, MAT.BRONZE_CHAIN);
+            setVoxel(shaftX - half, y, shaftZ + p, MAT.BRONZE_CHAIN);
+            setVoxel(shaftX + half, y, shaftZ - p, MAT.BRONZE_CHAIN);
+          }
+        }
+      }
+
+      // 4) 塔顶青铜卷扬机房、巨型滑轮与航标灯
+      fillBox(shaftX - half, roofY, shaftZ - half, shaftX + half, roofY, shaftZ + half, MAT.BRONZE_GOLD);
+      fillBox(shaftX - 1, roofY + 1, shaftZ - 1, shaftX + 1, roofY + 1, shaftZ + 1, MAT.BRONZE_DARK);
+      // 顶部大型青铜滑轮圈
+      for (let a = 0; a < 360; a += 30) {
+        const r = THREE.MathUtils.degToRad(a);
+        setVoxel(shaftX + Math.round(Math.cos(r) * 2), roofY + 2 + Math.round(Math.sin(r) * 2), shaftZ, MAT.BRONZE_GOLD);
+      }
+      setVoxel(shaftX, roofY + 5, shaftZ, MAT.LIGHT_LANTERN);
+
+      // 5) 井道内垂直悬垂缆绳 + 悬空木石升降吊篮 + 配重块
+      const cabinY = Math.round(yBot + (yTop - yBot) * cabinRatio);
+
+      // 主升降缆绳（贯穿顶部滑轮直垂吊篮顶）
+      for (let y = cabinY + 3; y <= roofY + 2; y++) {
+        setVoxel(shaftX, y, shaftZ, MAT.BRONZE_CHAIN);
+      }
+      // 配重块与副缆绳（贴近一侧井壁反向悬吊）
+      const cwY = Math.round(yTop - (cabinY - yBot));
+      for (let y = cwY; y <= roofY + 1; y++) {
+        setVoxel(shaftX + 1, y, shaftZ - 1, MAT.BRONZE_CHAIN);
+      }
+      setVoxel(shaftX + 1, cwY, shaftZ - 1, MAT.BRONZE_GOLD);
+      setVoxel(shaftX + 1, cwY - 1, shaftZ - 1, MAT.STONE_DARK);
+
+      // 悬空 3×3×4 木石升降吊篮（内部透出温暖灯光，辨识度拉满）
+      fillBox(shaftX - 1, cabinY, shaftZ - 1, shaftX + 1, cabinY, shaftZ + 1, MAT.WOOD_PLANK);
+      fillBox(shaftX - 1, cabinY - 1, shaftZ - 1, shaftX + 1, cabinY - 1, shaftZ + 1, MAT.STONE_DARK);
+      for (const sx of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          setVoxel(shaftX + sx, cabinY + 1, shaftZ + sz, MAT.WOOD_DARK);
+          setVoxel(shaftX + sx, cabinY + 2, shaftZ + sz, MAT.WOOD_DARK);
+          setVoxel(shaftX + sx, cabinY + 3, shaftZ + sz, MAT.BRONZE_GOLD);
+        }
+      }
+      // 吊篮顶部青铜十字吊架与舱内暖灯
+      setVoxel(shaftX, cabinY + 3, shaftZ, MAT.BRONZE_GOLD);
+      setVoxel(shaftX - 1, cabinY + 3, shaftZ, MAT.BRONZE_GOLD);
+      setVoxel(shaftX + 1, cabinY + 3, shaftZ, MAT.BRONZE_GOLD);
+      setVoxel(shaftX, cabinY + 3, shaftZ - 1, MAT.BRONZE_GOLD);
+      setVoxel(shaftX, cabinY + 3, shaftZ + 1, MAT.BRONZE_GOLD);
+      setVoxel(shaftX, cabinY + 2, shaftZ, MAT.LIGHT_LANTERN);
+    }
+
+    // 5.4 编织全城三维交通联通网络
+    function buildAllInterconnections() {
+      const P = PLATFORMS;
+
+      // ① 6 座石砌拱门高架桥：将树心枢纽广场直接接入四周全部下层核心区与上层内圈
+      buildStoneViaduct(P.HUB, P.L0_FORGE, 2);
+      buildStoneViaduct(P.HUB, P.L1_RES_A, 2);
+      buildStoneViaduct(P.HUB, P.L2_RES_B, 2);
+      buildStoneViaduct(P.HUB, P.L3_HALL,  2);
+      buildStoneViaduct(P.HUB, P.U0_RES_C, 1); // 斜升石拱阶梯廊桥通往上层居住区
+      buildStoneViaduct(P.HUB, P.U2_RES_D, 1);
+
+      // 将螺旋阶梯 Y=95 处的高层观景平台，通过一座石拱高架桥接入最近的下层分支平台
+      const highLanding = stairLandings.find(l => l.y === 95);
+      if (highLanding) {
+        const lowerPlats = [P.L0_FORGE, P.L1_RES_A, P.L2_RES_B, P.L3_HALL];
+        let nearest = lowerPlats[0], minD = 9999;
+        for (const lp of lowerPlats) {
+          const d = Math.hypot(lp.x - highLanding.x, lp.z - highLanding.z);
+          if (d < minD) { minD = d; nearest = lp; }
+        }
+        buildStoneViaduct(
+          { x: highLanding.x, y: highLanding.y, z: highLanding.z, radius: 3 },
+          nearest,
+          2
+        );
+      }
+
+      // ② 8 条悬垂式索桥：串联起下层外环与上层外环（双环空中索桥网络）
+      buildSuspensionBridge(P.L0_FORGE, P.L1_RES_A, 5.2);
+      buildSuspensionBridge(P.L1_RES_A, P.L2_RES_B, 5.4);
+      buildSuspensionBridge(P.L2_RES_B, P.L3_HALL,  5.0);
+      buildSuspensionBridge(P.L3_HALL,  P.L0_FORGE, 5.0);
+
+      buildSuspensionBridge(P.U0_RES_C,   P.U1_OBS,     4.6);
+      buildSuspensionBridge(P.U1_OBS,     P.U2_RES_D,   4.8);
+      buildSuspensionBridge(P.U2_RES_D,   P.U3_TERRACE, 4.6);
+      buildSuspensionBridge(P.U3_TERRACE, P.U0_RES_C,   4.4);
+
+      // ③ 3 座垂直镂空青铜桁架升降井（跨层纵向联动上下错层平台）
+      // 东侧锻造物资升降井：锻造工坊 (Y=118) ↔ 东上层平台 (Y=148)
+      buildVerticalElevatorShaft(34, 2, P.L0_FORGE, P.U3_TERRACE, 0.45);
+      // 西侧学者观星升降井：西居住区 (Y=124) ↔ 观星高塔 (Y=155)
+      buildVerticalElevatorShaft(-33, -2, P.L2_RES_B, P.U1_OBS, 0.56);
+      // 南侧居民高速升降井：南居住区 (Y=114) ↔ 东南高枝居住区 (Y=146)
+      buildVerticalElevatorShaft(1, 33, P.L1_RES_A, P.U0_RES_C, 0.38);
+    }
+
+    // =========================================================================
+    // 模块 6：6 邻域隐藏面剔除、体素 AO 烘焙与 3 组 InstancedMesh 装配
+    // =========================================================================
+
+    function buildCulledInstancedMeshes(scene) {
+      // 紧凑 32 位整型打包：(ix | (y << 8) | (iz << 16) | (id << 24))，零 GC 压力
+      const buckets = [[], [], []];
+      let totalSolid = 0;
+      let maxVisibleY = 0;
+
+      const strideY = GX * GZ;
+      for (let y = 0; y < GY; y++) {
+        const yOff = y * strideY;
+        for (let iz = 0; iz < GZ; iz++) {
+          const zOff = yOff + iz * GX;
+          for (let ix = 0; ix < GX; ix++) {
+            const idx = zOff + ix;
+            const id = voxelGrid[idx];
+            if (id === 0) continue;
+            totalSolid++;
+
+            // 6 邻域隐藏面剔除：仅当上下左右前后至少有一个邻居是空气(0)时保留
+            const openXNeg = (ix === 0)      ? true : (voxelGrid[idx - 1] === 0);
+            const openXPos = (ix === GX - 1) ? true : (voxelGrid[idx + 1] === 0);
+            const openZNeg = (iz === 0)      ? true : (voxelGrid[idx - GX] === 0);
+            const openZPos = (iz === GZ - 1) ? true : (voxelGrid[idx + GX] === 0);
+            const openYPos = (y === GY - 1)  ? true : (voxelGrid[idx + strideY] === 0);
+            // Y = 0 贴地底面视为接触岩层不可见，仅当 y > 0 且下方为空气才算暴露
+            const openYNeg = (y === 0)       ? false : (voxelGrid[idx - strideY] === 0);
+
+            if (openXNeg || openXPos || openZNeg || openZPos || openYPos || openYNeg) {
+              if (y > maxVisibleY) maxVisibleY = y;
+              const packed = (ix | (y << 8) | (iz << 16) | (id << 24)) >>> 0;
+              buckets[getMatGroup(id)].push(packed);
+            }
+          }
+        }
+      }
+
+      // 单位 1×1×1 标准正方体几何（严禁非等比拉伸）
+      const unitBoxGeo = new THREE.BoxGeometry(1, 1, 1);
+
+      // ① 铸造青铜类（高金属度 metalness: 0.72, roughness: 0.38）
+      const bronzeMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        metalness: 0.72,
+        roughness: 0.38,
+        envMapIntensity: 1.35
+      });
+
+      // ② 石材与木石建筑类（低金属度 metalness: 0.06, roughness: 0.86）
+      const stoneMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        metalness: 0.06,
+        roughness: 0.86,
+        envMapIntensity: 0.55
+      });
+
+      // ③ 自发光类（利用 onBeforeCompile 让每实例颜色精确驱动 emissive 发光色）
+      const emissiveMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        emissive: 0xffffff,
+        emissiveIntensity: 1.65,
+        roughness: 0.22,
+        metalness: 0.0
+      });
+      emissiveMat.onBeforeCompile = (shader) => {
+        shader.fragmentShader = shader.fragmentShader.replace(
+          '#include <emissivemap_fragment>',
+          `#include <emissivemap_fragment>
+           #ifdef USE_INSTANCING_COLOR
+             totalEmissiveRadiance *= vColor;
+           #endif`
+        );
+      };
+
+      const materials = [bronzeMat, stoneMat, emissiveMat];
+      const meshes = [];
+      const dummy = new THREE.Matrix4();
+      const baseColor = new THREE.Color();
+      const hsl = { h: 0, s: 0, l: 0 };
+
+      // 快速邻域体素环境光遮蔽（烘焙凹槽、拱底与街巷立体感）
+      const aoOffsets = [
+        [ 1, 1, 0], [-1, 1, 0], [0, 1,  1], [0, 1, -1],
+        [ 1, 1, 1], [-1, 1, 1], [1, 1, -1], [-1, 1, -1],
+        [ 1, 0, 1], [-1, 0, 1], [1, 0, -1], [-1, 0, -1]
+      ];
+
+      for (let g = 0; g < 3; g++) {
+        const list = buckets[g];
+        const count = list.length;
+        const instMesh = new THREE.InstancedMesh(unitBoxGeo, materials[g], Math.max(1, count));
+        instMesh.frustumCulled = false;
+
+        // 自发光体不投射阴影，青铜与石木建筑开启高质量阴影
+        if (g !== 2) {
+          instMesh.castShadow = true;
+          instMesh.receiveShadow = true;
+        }
+
+        for (let i = 0; i < count; i++) {
+          const packed = list[i];
+          const ix = packed & 0xff;
+          const y  = (packed >>> 8) & 0xff;
+          const iz = (packed >>> 16) & 0xff;
+          const id = (packed >>> 24) & 0xff;
+
+          const wx = ix - OX;
+          const wz = iz - OZ;
+
+          // 纯平移单位矩阵（1×1×1 绝对等大）
+          dummy.makeTranslation(wx, y + 0.5, wz);
+          instMesh.setMatrixAt(i, dummy);
+
+          // 计算精细明度抖动、高度微调与烘焙体素 AO
+          const pal = PALETTE[id] || PALETTE[MAT.STONE_LIGHT];
+          baseColor.setHex(pal.hex);
+          baseColor.getHSL(hsl);
+
+          const hJitter = (hash3(wx, y, wz) - 0.5) * 2.0 * pal.jitter;
+          const hueShift = (hash3(wz + 17, wx - 13, y) - 0.5) * 0.025;
+
+          let aoFactor = 1.0;
+          if (g !== 2) {
+            let occ = 0;
+            for (let k = 0; k < aoOffsets.length; k++) {
+              const o = aoOffsets[k];
+              if (getVoxel(wx + o[0], y + o[1], wz + o[2]) !== 0) occ++;
+            }
+            // 柔和腔体遮蔽：空旷高点亮丽通透，树皮沟槽与拱券底部深邃厚重
+            aoFactor = 1.0 - (occ / aoOffsets.length) * 0.34;
+            // 轻微的日照垂直梯度（顶部树冠略微受光提亮）
+            const heightBoost = 0.94 + (y / 200) * 0.12;
+            aoFactor *= heightBoost;
+          }
+
+          const finalL = THREE.MathUtils.clamp((hsl.l + hJitter) * aoFactor, 0.03, 0.96);
+          const finalS = THREE.MathUtils.clamp(hsl.s + hJitter * 0.25, 0.0, 1.0);
+          baseColor.setHSL((hsl.h + hueShift + 1) % 1, finalS, finalL);
+          instMesh.setColorAt(i, baseColor);
+        }
+
+        instMesh.instanceMatrix.needsUpdate = true;
+        if (instMesh.instanceColor) instMesh.instanceColor.needsUpdate = true;
+        scene.add(instMesh);
+        meshes.push(instMesh);
+      }
+
+      const totalVisible = buckets[0].length + buckets[1].length + buckets[2].length;
+      return {
+        meshes,
+        stats: {
+          maxVisibleY,
+          totalSolid,
+          totalVisible,
+          bronzeCount: buckets[0].length,
+          stoneCount: buckets[1].length,
+          emissiveCount: buckets[2].length,
+          cullRate: totalSolid > 0 ? ((1 - totalVisible / totalSolid) * 100).toFixed(1) : '0.0'
+        }
+      };
+    }
+
+    // =========================================================================
+    // 模块 7：Three.js 渲染舞台、程序化 PMREM 金属环境贴图、黄昏天穹与交互镜头
+    // =========================================================================
+
+    function createProceduralEnvMap(renderer) {
+      // 零外部贴图：构建程序化黄金黄昏天空盒场景并烘焙为 PMREM，让高金属度青铜流光溢彩
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      const envScene = new THREE.Scene();
+
+      const envGeo = new THREE.SphereGeometry(60, 32, 20);
+      const envMat = new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        vertexShader: `
+          varying vec3 vDir;
+          void main() {
+            vDir = normalize(position);
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          varying vec3 vDir;
+          void main() {
+            float y = vDir.y;
+            vec3 ground = vec3(0.16, 0.13, 0.10);
+            vec3 horizon = vec3(0.88, 0.64, 0.42);
+            vec3 zenith = vec3(0.14, 0.28, 0.44);
+            vec3 col = y > 0.0
+              ? mix(horizon, zenith, pow(y, 0.55))
+              : mix(horizon * 0.55, ground, pow(-y, 0.45));
+            // 温暖日轮高光斑，赋予铸造青铜清晰镜面反射
+            vec3 sunDir = normalize(vec3(0.65, 0.48, 0.58));
+            float sun = pow(max(dot(vDir, sunDir), 0.0), 28.0);
+            col += vec3(2.8, 2.1, 1.3) * sun;
+            // 背面冷青补光带
+            vec3 rimDir = normalize(vec3(-0.7, 0.35, -0.6));
+            col += vec3(0.35, 0.62, 0.85) * pow(max(dot(vDir, rimDir), 0.0), 8.0);
+            gl_FragColor = vec4(col, 1.0);
+          }
+        `
+      });
+      envScene.add(new THREE.Mesh(envGeo, envMat));
+      const rt = pmrem.fromScene(envScene, 0.03);
+      envGeo.dispose();
+      envMat.dispose();
+      pmrem.dispose();
+      return rt.texture;
+    }
+
+    function createSkyDome() {
+      const skyGeo = new THREE.SphereGeometry(950, 36, 24);
+      const skyMat = new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        depthWrite: false,
+        vertexShader: `
+          varying vec3 vWorldPos;
+          void main() {
+            vec4 wp = modelMatrix * vec4(position, 1.0);
+            vWorldPos = wp.xyz;
+            gl_Position = projectionMatrix * viewMatrix * wp;
+          }
+        `,
+        fragmentShader: `
+          varying vec3 vWorldPos;
+          void main() {
+            vec3 d = normalize(vWorldPos);
+            float h = clamp(d.y * 0.85 + 0.12, 0.0, 1.0);
+            vec3 colLow  = vec3(0.24, 0.21, 0.23);
+            vec3 colMid  = vec3(0.46, 0.34, 0.28);
+            vec3 colSky  = vec3(0.11, 0.18, 0.29);
+            vec3 colTop  = vec3(0.05, 0.08, 0.15);
+
+            vec3 col = mix(colLow, colMid, smoothstep(0.0, 0.18, h));
+            col = mix(col, colSky, smoothstep(0.16, 0.52, h));
+            col = mix(col, colTop, smoothstep(0.50, 1.0, h));
+
+            // 落日余晖光晕
+            vec3 sunDir = normalize(vec3(0.65, 0.34, 0.62));
+            float s = max(dot(d, sunDir), 0.0);
+            col += vec3(0.75, 0.44, 0.22) * pow(s, 10.0) * 0.55;
+            col += vec3(1.0, 0.85, 0.62) * pow(s, 96.0) * 0.7;
+
+            gl_FragColor = vec4(col, 1.0);
+          }
+        `
+      });
+      return new THREE.Mesh(skyGeo, skyMat);
+    }
+
+    // -------------------------------------------------------------------------
+    // 主执行流程
+    // -------------------------------------------------------------------------
+
+    const container = document.getElementById('canvas-wrap');
+    const loaderEl = document.getElementById('loader');
+    const loaderStatus = document.getElementById('loader-status');
+    const loaderFill = document.getElementById('loader-fill');
+
+    function setProgress(pct, text) {
+      loaderFill.style.width = pct + '%';
+      loaderStatus.textContent = text;
+    }
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.12;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    container.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x282730, 0.00145);
+    scene.environment = createProceduralEnvMap(renderer);
+    scene.add(createSkyDome());
+
+    // 远景承托大地雾面圆盘（Y = -0.1，衬托底部岩土基座，不参与体素网格）
+    const groundDisk = new THREE.Mesh(
+      new THREE.CircleGeometry(680, 64),
+      new THREE.MeshStandardMaterial({ color: 0x252429, roughness: 0.96, metalness: 0.05 })
+    );
+    groundDisk.rotation.x = -Math.PI / 2;
+    groundDisk.position.y = -0.05;
+    groundDisk.receiveShadow = true;
+    scene.add(groundDisk);
+
+    // 灯光系统：黄金暮色主日光 + 冷青天空补光 + 半球反射光
+    const hemiLight = new THREE.HemisphereLight(0x8cb8e8, 0x4c3724, 0.72);
+    scene.add(hemiLight);
+
+    const sunLight = new THREE.DirectionalLight(0xffe0b2, 2.75);
+    sunLight.position.set(165, 195, 145);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.set(2048, 2048);
+    sunLight.shadow.camera.near = 40;
+    sunLight.shadow.camera.far = 520;
+    sunLight.shadow.camera.left = -125;
+    sunLight.shadow.camera.right = 125;
+    sunLight.shadow.camera.top = 220;
+    sunLight.shadow.camera.bottom = -40;
+    sunLight.shadow.bias = -0.00045;
+    sunLight.shadow.normalBias = 0.08;
+    sunLight.target.position.set(0, 100, 0);
+    scene.add(sunLight);
+    scene.add(sunLight.target);
+
+    const rimLight = new THREE.DirectionalLight(0x74a9dd, 0.95);
+    rimLight.position.set(-150, 130, -135);
+    scene.add(rimLight);
+
+    // 相机与 OrbitControls
+    const camera = new THREE.PerspectiveCamera(44, window.innerWidth / window.innerHeight, 1, 1800);
+    camera.position.set(155, 145, 225);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 108, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.minDistance = 32;
+    controls.maxDistance = 520;
+    controls.maxPolarAngle = Math.PI * 0.495;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.45;
+    controls.update();
+
+    // 镜头平滑飞跃预设
+    const CAM_PRESETS = {
+      overview:    { pos: [155, 145, 225], target: [0, 108, 0] },
+      roots:       { pos: [28, 42, 118],   target: [0, 38, 0] },
+      hub:         { pos: [42, 168, 52],   target: [0, 135, 0] },
+      forge:       { pos: [98, 142, 62],   target: [38, 126, 14] },
+      observatory: { pos: [-78, 184, 58],  target: [-31, 173, 13] },
+      hall:        { pos: [65, 152, -96],  target: [16, 134, -34] }
+    };
+
+    let camTween = null;
+    function flyToPreset(key) {
+      const p = CAM_PRESETS[key];
+      if (!p) return;
+      camTween = {
+        startPos: camera.position.clone(),
+        endPos: new THREE.Vector3(...p.pos),
+        startTarget: controls.target.clone(),
+        endTarget: new THREE.Vector3(...p.target),
+        t: 0
+      };
+    }
+
+    // 异步分阶段执行生成，确保加载进度条流畅刷新不假死
+    let builtMeshes = [];
+    async function generateCity() {
+      const tick = () => new Promise(r => setTimeout(r, 16));
+
+      setProgress(15, '正在浇筑巨型岩土基座、青铜主干与 7 条拱形盘根...');
+      await tick();
+      precomputeTrunk();
+      buildGroundPlatform();
+      buildMainTrunk();
+      buildGiantRoots();
+
+      setProgress(35, '正在生长两层青铜主枝、次级枝桠与雕塑感铜绿树冠...');
+      await tick();
+      buildBranchNetwork();
+      buildBronzeCanopy();
+
+      setProgress(52, '正在沿主树干实时半径缠绕 3.25 圈螺旋上升阶梯...');
+      await tick();
+      buildSpiralStaircase();
+
+      setProgress(70, '正在枝干节点构筑树心广场、观星高塔、锻造风车、大殿与石砌居住区...');
+      await tick();
+      buildHeartHubPlaza();
+      buildObservatoryTower();
+      buildSkyForgeAndWindmill();
+      buildGrandStoneHall();
+      buildResidentialDistrict(PLATFORMS.L1_RES_A);
+      buildResidentialDistrict(PLATFORMS.L2_RES_B);
+      buildResidentialDistrict(PLATFORMS.U0_RES_C);
+      buildResidentialDistrict(PLATFORMS.U2_RES_D);
+      buildResidentialDistrict(PLATFORMS.U3_TERRACE);
+
+      setProgress(84, '正在架设石砌拱门高架桥、双环悬垂索桥与 3 座垂直青铜升降井...');
+      await tick();
+      buildAllInterconnections();
+
+      setProgress(95, '正在执行 6 邻域隐藏面剔除与 3 组 InstancedMesh 烘焙装配...');
+      await tick();
+      const result = buildCulledInstancedMeshes(scene);
+      builtMeshes = result.meshes;
+
+      // 更新顶部 HUD 实测体素统计数据
+      const s = result.stats;
+      document.getElementById('st-height').textContent = `Y = ${s.maxVisibleY}`;
+      document.getElementById('st-cull').textContent   = `${s.cullRate}%`;
+      document.getElementById('st-solid').textContent  = s.totalSolid.toLocaleString();
+      document.getElementById('st-vis').textContent    = s.totalVisible.toLocaleString();
+      document.getElementById('st-bronze').textContent = s.bronzeCount.toLocaleString();
+      document.getElementById('st-other').textContent  = `${s.stoneCount.toLocaleString()} / ${s.emissiveCount.toLocaleString()}`;
+
+      setProgress(100, '青铜巨树城邦铸造完毕');
+      setTimeout(() => loaderEl.classList.add('hidden'), 260);
+    }
+
+    // 绑定按钮事件
+    document.querySelectorAll('[data-cam]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        flyToPreset(btn.dataset.cam);
+      });
+    });
+
+    const btnRotate = document.getElementById('btn-rotate');
+    btnRotate.addEventListener('click', () => {
+      controls.autoRotate = !controls.autoRotate;
+      btnRotate.classList.toggle('active', controls.autoRotate);
+      btnRotate.textContent = `自动缓转: ${controls.autoRotate ? '开' : '关'}`;
+    });
+
+    const btnShadow = document.getElementById('btn-shadow');
+    let shadowOn = true;
+    btnShadow.addEventListener('click', () => {
+      shadowOn = !shadowOn;
+      renderer.shadowMap.enabled = shadowOn;
+      sunLight.castShadow = shadowOn;
+      builtMeshes.forEach((m, idx) => {
+        if (idx !== 2) { m.castShadow = shadowOn; m.receiveShadow = shadowOn; }
+      });
+      btnShadow.classList.toggle('active', shadowOn);
+      btnShadow.textContent = `实时阴影: ${shadowOn ? '开' : '关'}`;
+    });
+
+    // 用户手动拖拽镜头时中止预设缓动
+    controls.addEventListener('start', () => { camTween = null; });
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // 主渲染循环
+    function animate() {
+      requestAnimationFrame(animate);
+      if (camTween) {
+        camTween.t = Math.min(1, camTween.t + 0.028);
+        const ease = 1 - Math.pow(1 - camTween.t, 3);
+        camera.position.lerpVectors(camTween.startPos, camTween.endPos, ease);
+        controls.target.lerpVectors(camTween.startTarget, camTween.endTarget, ease);
+        if (camTween.t >= 1) camTween = null;
+      }
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+    generateCity();
+  </script>
+</body>
+</html>

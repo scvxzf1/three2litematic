@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#111713" />
+  <title>Veyra, the City That Remembered the Stars</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: "DM Sans", sans-serif;
+      --parchment: #ead9b7;
+      --muted: #a9a78f;
+      --copper: #daab67;
+      --hairline: rgba(222, 191, 139, .18);
+      --glass: rgba(19, 24, 21, .82);
+    }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    body { color: var(--parchment); background: #111713; }
+    canvas { position: fixed; inset: 0; display: block; width: 100%; height: 100%; }
+    body::after { position: fixed; inset: 0; z-index: 1; content: ""; pointer-events: none; background: linear-gradient(90deg, rgba(11, 16, 14, .72) 0%, rgba(11, 16, 14, .42) 24%, transparent 58%), linear-gradient(0deg, rgba(10, 15, 13, .78) 0%, transparent 24%, transparent 76%, rgba(11, 15, 14, .36) 100%); }
+    .masthead, .legend, .footer { position: fixed; z-index: 2; }
+    .masthead { top: 0; left: 0; width: min(530px, 53vw); min-width: 330px; height: 100%; padding: clamp(26px, 5.1vh, 58px) 0 93px clamp(25px, 5.2vw, 82px); display: flex; flex-direction: column; align-items: flex-start; pointer-events: none; }
+    .eyebrow, .kicker { display: flex; align-items: center; gap: 11px; color: var(--copper); font-size: 10px; font-weight: 600; letter-spacing: .23em; text-transform: uppercase; }
+    .sigil { display: grid; width: 27px; height: 27px; place-items: center; border: 1px solid rgba(224, 190, 134, .52); border-radius: 50%; color: #edd7aa; font-family: "Cinzel", serif; font-size: 14px; }
+    h1 { max-width: 485px; margin: clamp(24px, 5.3vh, 57px) 0 13px; color: #f2e7cd; font-family: "Cinzel", serif; font-size: clamp(37px, 5.6vw, 76px); font-weight: 400; line-height: .99; letter-spacing: -.045em; text-shadow: 0 2px 30px rgba(0, 0, 0, .38); }
+    h1 span { display: block; color: #d8ae6c; font-size: .61em; line-height: 1.39; letter-spacing: .09em; }
+    .intro { max-width: 334px; margin: 9px 0 0; color: rgba(231, 225, 202, .77); font-size: 12px; line-height: 1.9; }
+    .rule { width: 220px; height: 1px; margin: 23px 0 19px; background: linear-gradient(90deg, rgba(224, 190, 134, .65), transparent); }
+    .architecture { color: rgba(232, 221, 194, .61); font-size: 10px; font-weight: 500; letter-spacing: .17em; line-height: 2.2; }
+    .architecture b { color: rgba(232, 221, 194, .89); font-weight: 500; }
+    .coordinates { display: flex; align-items: center; gap: 8px; margin-top: auto; padding-bottom: 14px; color: rgba(226, 214, 186, .53); font-size: 9px; letter-spacing: .17em; }
+    .coordinates::before { width: 5px; height: 5px; border-radius: 50%; background: #a7bc82; box-shadow: 0 0 12px rgba(167, 188, 130, .75); content: ""; }
+    .legend { right: clamp(20px, 4vw, 62px); bottom: 106px; width: min(256px, 25vw); padding: 15px 17px 13px; border: 1px solid var(--hairline); border-radius: 2px; background: var(--glass); box-shadow: 0 16px 45px rgba(0, 0, 0, .18); backdrop-filter: blur(14px); }
+    .legend-title { margin: 0 0 12px; color: var(--copper); font-size: 9px; font-weight: 600; letter-spacing: .19em; }
+    .legend-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0; border-top: 1px solid rgba(222, 191, 139, .09); color: rgba(232, 225, 204, .8); font-size: 10px; }
+    .legend-item span:last-child { color: var(--muted); font-size: 9px; }
+    .swatch { display: inline-block; width: 7px; height: 7px; margin-right: 8px; border-radius: 1px; background: #bb794f; box-shadow: 0 0 8px rgba(207, 163, 94, .24); }
+    .swatch.mint { background: #73a494; }
+    .swatch.stone { background: #d2c3a5; }
+    .swatch.ember { background: #eda65e; box-shadow: 0 0 9px rgba(251, 184, 96, .48); }
+    .footer { right: 0; bottom: 0; left: 0; display: flex; align-items: center; justify-content: space-between; min-height: 71px; padding: 0 clamp(24px, 5.2vw, 81px); border-top: 1px solid rgba(222, 191, 139, .12); background: rgba(14, 19, 17, .76); backdrop-filter: blur(15px); }
+    .footer-label { color: rgba(226, 214, 186, .68); font-family: "Cinzel", serif; font-size: 10px; letter-spacing: .1em; }
+    .stats { display: flex; align-items: center; gap: clamp(15px, 3.6vw, 52px); }
+    .stat { color: rgba(229, 223, 204, .56); font-size: 9px; letter-spacing: .09em; }
+    .stat strong { display: block; margin-bottom: 3px; color: #e5c795; font-family: "Cinzel", serif; font-size: 14px; font-weight: 400; letter-spacing: .05em; }
+    .hint { color: rgba(229, 223, 204, .48); font-size: 9px; letter-spacing: .1em; }
+    @media (max-width: 760px) {
+      .masthead { width: 78vw; min-width: 0; padding-top: 25px; padding-left: 24px; }
+      h1 { max-width: 80vw; margin-top: 5vh; font-size: clamp(34px, 10.3vw, 58px); }
+      .intro { max-width: 68vw; font-size: 11px; }
+      .legend { right: 15px; bottom: 83px; width: 190px; padding: 11px 13px; }
+      .architecture, .rule { display: none; }
+      .footer { min-height: 61px; padding: 0 18px; }
+      .stats { gap: 12px; }
+      .stat { font-size: 8px; }
+      .stat strong { font-size: 12px; }
+      .footer-label, .hint { display: none; }
+    }
+  </style>
+  <script type="importmap">
+  { "imports": { "three": "https://unpkg.com/three@0.187.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.187.0/examples/jsm/" } }
+  </script>
+</head>
+<body>
+  <header class="masthead">
+    <div class="eyebrow"><span class="sigil">V</span> ATLAS OF THE FORGOTTEN REALMS</div>
+    <h1>VEYRA<span>THE BRONZE CITY</span></h1>
+    <p class="intro">Before the desert learned its name, Veyra had already hammered its history into copper. Above its stepped bronze ramparts, a forest of stone remembers the shape of the stars.</p>
+    <div class="rule"></div>
+    <div class="architecture"><b>01</b> &nbsp; THE DUST ROAD &nbsp;·&nbsp; <b>02</b> &nbsp; THE GILDED GATES<br/><b>03</b> &nbsp; THE RAISED SANCTUARY &nbsp;·&nbsp; <b>04</b> &nbsp; THE PALE WORLD TREE</div>
+    <div class="coordinates">THE HIGH WASTES &nbsp;·&nbsp; CARTOGRAPHER'S PLATE 07</div>
+  </header>
+  <aside class="legend" aria-label="Architectural materials">
+    <p class="legend-title">MATTER OF THE CITY</p>
+    <div class="legend-item"><span><i class="swatch"></i>Hammered copper</span><span>CUT · GILT · WORN</span></div>
+    <div class="legend-item"><span><i class="swatch mint"></i>Living patina</span><span>RAIN · TIME · SALT</span></div>
+    <div class="legend-item"><span><i class="swatch stone"></i>Carved pale stone</span><span>THE LIFELINE</span></div>
+    <div class="legend-item"><span><i class="swatch ember"></i>Fires of the old sky</span><span>STILL BURNING</span></div>
+  </aside>
+  <footer class="footer">
+    <span class="footer-label">VEYRA &nbsp; / &nbsp; A CITY CAST FOR ETERNITY</span>
+    <div class="stats">
+      <div class="stat"><strong id="stat-size">—</strong>THE COMPLETE PLATE</div>
+      <div class="stat"><strong id="stat-people">—</strong>HOUSES OF STONE</div>
+      <div class="stat"><strong id="stat-height">—</strong>THE SKY-SPIRE</div>
+    </div>
+    <span class="hint">DRAG TO ORBIT &nbsp; · &nbsp; SCROLL TO APPROACH</span>
+  </footer>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    const SIDE = 240;
+    const HEIGHT = 166;
+    const WORLD_CENTER = 120;
+    const LOCAL_CENTER = 87;
+    const OUTER_WALL_RADIUS = 72;
+    const INNER_WALL_RADIUS = 36;
+    const LAYER = SIDE * SIDE;
+    const VOLUME = LAYER * HEIGHT;
+    const PALETTE = {
+      deep:       { id: 'minecraft:deepslate_tiles',                     color: '#42484a' },
+      brick:      { id: 'minecraft:stone_bricks',                         color: '#777875' },
+      mossBrick:  { id: 'minecraft:mossy_stone_bricks',                   color: '#72796b' },
+      andesite:   { id: 'minecraft:andesite',                             color: '#85847c' },
+      granite:    { id: 'minecraft:granite',                              color: '#936b55' },
+      tuff:       { id: 'minecraft:tuff',                                 color: '#72736a' },
+      gravel:     { id: 'minecraft:gravel',                               color: '#777568' },
+      mud:        { id: 'minecraft:packed_mud',                            color: '#887057' },
+      sand:       { id: 'minecraft:sandstone',                            color: '#c6ae7c' },
+      bronze:     { id: 'minecraft:copper_block',                         color: '#c06b4f' },
+      rubbed:     { id: 'minecraft:exposed_copper',                       color: '#a17d67' },
+      verdigris:  { id: 'minecraft:oxidized_copper',                      color: '#52a284' },
+      oldCopper:  { id: 'minecraft:weathered_copper',                     color: '#6c996e' },
+      gilt:       { id: 'minecraft:yellow_terracotta',                    color: '#ba8523' },
+      darkGilt:   { id: 'minecraft:polished_blackstone_bricks',           color: '#302a31' },
+      copper:     { id: 'minecraft:exposed_copper',                       color: '#aa775f' },
+      chalk:      { id: 'minecraft:calcite',                              color: '#d8d3c1' },
+      paleStone:  { id: 'minecraft:polished_diorite',                     color: '#c0c1c2' },
+      sandstone:  { id: 'minecraft:sandstone',                            color: '#bca77c' },
+      spruce:     { id: 'minecraft:stripped_spruce_wood',                 color: '#715339' },
+      cedar:      { id: 'minecraft:spruce_planks',                        color: '#765b3d' },
+      darkWood:   { id: 'minecraft:spruce_wood',                          color: '#493421' },
+      roof:       { id: 'minecraft:deepslate_tiles',                      color: '#444649' },
+      tealRoof:   { id: 'minecraft:dark_prismarine',                      color: '#355e52' },
+      water:      { id: 'minecraft:cyan_stained_glass',                   color: '#50948d', opacity: .78 },
+      glass:      { id: 'minecraft:light_blue_stained_glass',             color: '#93bcb1', opacity: .66 },
+      ice:        { id: 'minecraft:light_blue_stained_glass',             color: '#80b5b0', opacity: .66 },
+      obsidian:   { id: 'minecraft:polished_blackstone_bricks',           color: '#393b3b' },
+      lamp:       { id: 'minecraft:ochre_froglight',                      color: '#eed493', isLight: true, emissive: '#ffc873' },
+      flame:      { id: 'minecraft:shroomlight',                           color: '#df9459', isLight: true, emissive: '#ffad61' },
+      starLight:  { id: 'minecraft:sea_lantern',                          color: '#a5d1b9', isLight: true, emissive: '#84e6c2' },
+    };
+
+    const BLOCKS = [null, ...Object.values(PALETTE)];
+    const blockNumbers = new Map(BLOCKS.slice(1).map((material, index) => [material.id, index + 1]));
+    const materialNumbers = new Map(Object.entries(PALETTE).map(([name], index) => [name, index + 1]));
+
+    class VoxelWorld {
+      constructor(meta) {
+        this.name = meta.name;
+        this.author = meta.author;
+        this.description = meta.description;
+        this.ids = new Uint8Array(VOLUME);
+        this.occupied = [];
+        this.activeVoxelCount = 0;
+        this.houseCount = 0;
+        this.horizontalScale = 1;
+        this.verticalScale = 1;
+        this.coordinateOrigin = LOCAL_CENTER;
+        this.coordinateDestination = WORLD_CENTER;
+        this.index = (x, y, z) => y * LAYER + z * SIDE + x;
+      }
+
+      setBuildingScale(horizontal, vertical = horizontal) {
+        this.horizontalScale = horizontal;
+        this.verticalScale = vertical;
+      }
+
+      setCoordinateSpace(origin, destination) {
+        this.coordinateOrigin = origin;
+        this.coordinateDestination = destination;
+      }
+
+      mapRange(value, origin, destination, scale) {
+        const first = Math.floor((value - origin) * scale + destination);
+        const last = Math.floor((value + 1 - origin) * scale + destination) - 1;
+        return [first, Math.max(first, last)];
+      }
+
+      set(x, y, z, material) {
+        const blockNumber = typeof material === 'number' ? material : typeof material === 'string' ? materialNumbers.get(material) || blockNumbers.get(material) : blockNumbers.get(material?.id);
+        if (!blockNumber) return;
+        const [minX, maxX] = this.mapRange(x, this.coordinateOrigin, this.coordinateDestination, this.horizontalScale);
+        const [minZ, maxZ] = this.mapRange(z, this.coordinateOrigin, this.coordinateDestination, this.horizontalScale);
+        const [minY, maxY] = this.mapRange(y, 4, 4, this.verticalScale);
+        if (minX < 0 || maxX >= SIDE || minZ < 0 || maxZ >= SIDE || minY < 0 || maxY >= HEIGHT) return;
+        for (let mappedY = minY; mappedY <= maxY; mappedY++) {
+          for (let mappedZ = minZ; mappedZ <= maxZ; mappedZ++) {
+            for (let mappedX = minX; mappedX <= maxX; mappedX++) {
+              const index = this.index(mappedX, mappedY, mappedZ);
+              if (this.ids[index] === 0) {
+                this.occupied.push(index);
+                this.activeVoxelCount++;
+              }
+              this.ids[index] = blockNumber;
+            }
+          }
+        }
+      }
+
+      del(x, y, z) {
+        const [minX, maxX] = this.mapRange(x, this.coordinateOrigin, this.coordinateDestination, this.horizontalScale);
+        const [minZ, maxZ] = this.mapRange(z, this.coordinateOrigin, this.coordinateDestination, this.horizontalScale);
+        const [minY, maxY] = this.mapRange(y, 4, 4, this.verticalScale);
+        for (let mappedY = minY; mappedY <= maxY; mappedY++) {
+          for (let mappedZ = minZ; mappedZ <= maxZ; mappedZ++) {
+            for (let mappedX = minX; mappedX <= maxX; mappedX++) {
+              if (mappedX < 0 || mappedX >= SIDE || mappedZ < 0 || mappedZ >= SIDE || mappedY < 0 || mappedY >= HEIGHT) continue;
+              const index = this.index(mappedX, mappedY, mappedZ);
+              if (this.ids[index]) this.activeVoxelCount--;
+              this.ids[index] = 0;
+            }
+          }
+        }
+      }
+
+      fillBox(x0, y0, z0, x1, y1, z1, material) {
+        const blockNumber = typeof material === 'number' ? material : materialNumbers.get(material);
+        const [rangeMinX] = this.mapRange(Math.min(x0, x1), this.coordinateOrigin, this.coordinateDestination, this.horizontalScale);
+        const [, rangeMaxX] = this.mapRange(Math.max(x0, x1), this.coordinateOrigin, this.coordinateDestination, this.horizontalScale);
+        const [rangeMinY] = this.mapRange(Math.min(y0, y1), 4, 4, this.verticalScale);
+        const [, rangeMaxY] = this.mapRange(Math.max(y0, y1), 4, 4, this.verticalScale);
+        const [rangeMinZ] = this.mapRange(Math.min(z0, z1), this.coordinateOrigin, this.coordinateDestination, this.horizontalScale);
+        const [, rangeMaxZ] = this.mapRange(Math.max(z0, z1), this.coordinateOrigin, this.coordinateDestination, this.horizontalScale);
+        const minX = Math.max(0, rangeMinX);
+        const maxX = Math.min(SIDE - 1, rangeMaxX);
+        const minY = Math.max(0, rangeMinY);
+        const maxY = Math.min(HEIGHT - 1, rangeMaxY);
+        const minZ = Math.max(0, rangeMinZ);
+        const maxZ = Math.min(SIDE - 1, rangeMaxZ);
+        if (!blockNumber || minX > maxX || minY > maxY || minZ > maxZ) return;
+        for (let y = minY; y <= maxY; y++) {
+          const layerOffset = y * LAYER;
+          for (let z = minZ; z <= maxZ; z++) {
+            const rowOffset = layerOffset + z * SIDE + minX;
+            for (let index = rowOffset, end = rowOffset + maxX - minX; index <= end; index++) {
+              if (this.ids[index] === 0) {
+                this.occupied.push(index);
+                this.activeVoxelCount++;
+              }
+              this.ids[index] = blockNumber;
+            }
+          }
+        }
+      }
+
+      hollowBox(x0, y0, z0, x1, y1, z1, material) {
+        const minX = Math.min(x0, x1), maxX = Math.max(x0, x1);
+        const minY = Math.min(y0, y1), maxY = Math.max(y0, y1);
+        const minZ = Math.min(z0, z1), maxZ = Math.max(z0, z1);
+        for (let y = minY; y <= maxY; y++) {
+          for (let x = minX; x <= maxX; x++) {
+            for (let z = minZ; z <= maxZ; z++) {
+              if (x === minX || x === maxX || y === minY || y === maxY || z === minZ || z === maxZ) this.set(x, y, z, material);
+            }
+          }
+        }
+      }
+
+      cylinder(cx, y0, cz, radius, height, material, hollow = false) {
+        const outer = radius * radius;
+        const inner = (radius - 1.4) * (radius - 1.4);
+        for (let y = y0; y < y0 + height; y++) {
+          for (let x = cx - radius; x <= cx + radius; x++) {
+            for (let z = cz - radius; z <= cz + radius; z++) {
+              const distance = (x - cx) ** 2 + (z - cz) ** 2;
+              if (distance <= outer && (!hollow || distance >= inner)) this.set(x, y, z, material);
+            }
+          }
+        }
+      }
+
+      sphere(cx, cy, cz, radius, material) {
+        for (let y = cy - radius; y <= cy + radius; y++) {
+          for (let x = cx - radius; x <= cx + radius; x++) {
+            for (let z = cz - radius; z <= cz + radius; z++) {
+              if ((x - cx) ** 2 + (y - cy) ** 2 + (z - cz) ** 2 <= radius * radius) this.set(x, y, z, material);
+            }
+          }
+        }
+      }
+
+      beam(x0, y0, z0, x1, y1, z1, radius, material) {
+        const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
+        const steps = Math.ceil(Math.hypot(dx, dy, dz) * 2);
+        const squaredRadius = radius * radius;
+        const reach = Math.ceil(radius);
+        for (let step = 0; step <= steps; step++) {
+          const fraction = step / steps;
+          const cx = x0 + dx * fraction, cy = y0 + dy * fraction, cz = z0 + dz * fraction;
+          const ix = Math.round(cx), iy = Math.round(cy), iz = Math.round(cz);
+          for (let x = ix - reach; x <= ix + reach; x++) {
+            for (let y = iy - reach; y <= iy + reach; y++) {
+              for (let z = iz - reach; z <= iz + reach; z++) {
+                if ((x - cx) ** 2 + (y - cy) ** 2 + (z - cz) ** 2 <= squaredRadius) this.set(x, y, z, material);
+              }
+            }
+          }
+        }
+      }
+
+      line(x0, y0, z0, x1, y1, z1, material) {
+        this.beam(x0, y0, z0, x1, y1, z1, .65, material);
+      }
+
+      exportData() {
+        const voxels = new Array(this.activeVoxelCount);
+        let blockIndex = 0;
+        for (let item = 0; item < this.occupied.length; item++) {
+          const index = this.occupied[item];
+          if (!this.ids[index]) continue;
+          const y = Math.floor(index / LAYER);
+          const withinLayer = index - y * LAYER;
+          const z = Math.floor(withinLayer / SIDE);
+          voxels[blockIndex++] = [withinLayer - z * SIDE, y, z, BLOCKS[this.ids[index]].id];
+        }
+        return { name: this.name, author: this.author, description: this.description, voxels };
+      }
+
+      mountToScene(scene) {
+        const grouped = new Map();
+        let lowest = Infinity, highest = -Infinity;
+        for (let item = 0; item < this.occupied.length; item++) {
+          const index = this.occupied[item];
+          const id = this.ids[index];
+          if (!id) continue;
+          const y = Math.floor(index / LAYER);
+          if (y < lowest) lowest = y;
+          if (y > highest) highest = y;
+          const withinLayer = index - y * LAYER;
+          const z = Math.floor(withinLayer / SIDE);
+          const x = withinLayer - z * SIDE;
+          if (x > 0 && this.ids[index - 1] && x < SIDE - 1 && this.ids[index + 1] &&
+              y > 0 && this.ids[index - LAYER] && y < HEIGHT - 1 && this.ids[index + LAYER] &&
+              z > 0 && this.ids[index - SIDE] && z < SIDE - 1 && this.ids[index + SIDE]) continue;
+          let voxels = grouped.get(id);
+          if (!voxels) grouped.set(id, voxels = []);
+          voxels.push([x, y, z]);
+        }
+
+        const geometry = new THREE.BoxGeometry(1, 1, 1);
+        const matrix = new THREE.Matrix4();
+        const materials = new Map();
+        for (const [id, voxels] of grouped) {
+          const materialSpec = BLOCKS[id];
+          const luminous = Boolean(materialSpec.isLight);
+          let material = materials.get(id);
+          if (!material) {
+            material = new THREE.MeshStandardMaterial({
+              color: materialSpec.color,
+              roughness: materialSpec.opacity < .85 ? .25 : .8,
+              metalness: materialSpec.id.includes('copper') ? .25 : .05,
+              transparent: materialSpec.opacity < .85,
+              opacity: materialSpec.opacity || 1,
+              emissive: luminous ? materialSpec.emissive : '#000000',
+              emissiveIntensity: luminous ? .65 : 0,
+            });
+            materials.set(id, material);
+          }
+          const mesh = new THREE.InstancedMesh(geometry, material, voxels.length);
+          mesh.castShadow = false;
+          mesh.receiveShadow = true;
+          for (let index = 0; index < voxels.length; index++) {
+            const voxel = voxels[index];
+            matrix.makeTranslation(voxel[0] + .5, voxel[1] + .5, voxel[2] + .5);
+            mesh.setMatrixAt(index, matrix);
+          }
+          mesh.instanceMatrix.needsUpdate = true;
+          scene.add(mesh);
+        }
+        geometry.dispose();
+        const height = highest - lowest + 1;
+        return {
+          center: new THREE.Vector3(WORLD_CENTER + .5, (lowest + highest + 1) * .45, WORLD_CENTER + .5),
+          size: new THREE.Vector3(SIDE, height, SIDE),
+        };
+      }
+    }
+
+    const world = new VoxelWorld({
+      name: 'Veyra — City Cast for Eternity',
+      author: 'three2litematic · Original commission',
+      description: 'An original 240×153 ancient bronze city-state: one uninterrupted buried foundation, an expansive rocky desert watershed and dust road, weathered hammered-copper streets, two separately fortified gate walls, enlarged sanctuary terraces, twenty-four widely spaced timber townhouses, lantern bridges, and a carved pale-stone world tree whose summit reaches Minecraft Y=152, with branch-borne astronomer galleries. All blocks are placed on the exact Minecraft grid.',
+    });
+
+    function hash(x, y = 0, z = 0) {
+      let value = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(z | 0, 2147483647)) | 0;
+      value = Math.imul(value ^ (value >>> 13), 1274126177);
+      return ((value ^ (value >>> 16)) >>> 0) / 4294967296;
+    }
+
+    function squareRadius(x, z) {
+      const dx = Math.abs(x - 87), dz = Math.abs(z - 87);
+      return Math.max(dx, dz) + Math.min(dx, dz) * .39;
+    }
+
+    function ringShape(x, z, radius) {
+      return squareRadius(x, z) <= radius;
+    }
+
+    function circle(cx, cy, cz, radius, material) {
+      for (let degree = 0; degree < 360; degree += 1.6) {
+        const radians = degree * Math.PI / 180;
+        world.set(Math.round(cx + Math.cos(radians) * radius), cy, Math.round(cz + Math.sin(radians) * radius), material);
+      }
+    }
+
+    function octagonalMedallion(cx, cz, y, outerRadius, innerRadius, edgeMaterial, bodyMaterial) {
+      for (let z = cz - outerRadius; z <= cz + outerRadius; z++) {
+        for (let x = cx - outerRadius; x <= cx + outerRadius; x++) {
+          const dx = Math.abs(x - cx), dz = Math.abs(z - cz);
+          const radius = Math.max(dx, dz) + Math.min(dx, dz) * .42;
+          if (radius <= outerRadius) world.set(x, y, z, radius > outerRadius - 1.15 ? edgeMaterial : bodyMaterial);
+        }
+      }
+    }
+
+    function steppedPyramid(cx, cz, baseY, outerRadius, peakRadius, material) {
+      for (let radius = outerRadius; radius >= peakRadius; radius -= 2) {
+        const elevation = Math.floor((outerRadius - radius) * .48);
+        world.fillBox(cx - radius, baseY + elevation, cz - radius, cx + radius, baseY + elevation, cz + radius, material);
+        world.hollowBox(cx - radius, baseY + elevation, cz - radius, cx + radius, baseY + elevation + 1, cz + radius, material);
+      }
+    }
+
+    function buildDesert() {
+      for (let y = 0; y < 4; y++) {
+        for (let z = 0; z < SIDE; z++) {
+          for (let x = 0; x < SIDE; x++) {
+            const weather = hash(x >> 1, y * 3, z >> 1);
+            let stone = y === 0 ? 'deep' : y === 3 ? 'sandstone' : y === 2 && weather > .72 ? 'granite' : 'tuff';
+            if (y === 3 && weather < .18) stone = 'gravel';
+            world.set(x, y, z, stone);
+          }
+        }
+      }
+
+      for (let z = 0; z < SIDE; z++) {
+        for (let x = 0; x < SIDE; x++) {
+          const weather = hash(x >> 1, 17, z >> 1);
+          world.set(x, 4, z, weather > .87 ? 'sandstone' : weather > .69 ? 'granite' : weather < .13 ? 'gravel' : 'tuff');
+        }
+      }
+
+      const mesas = [
+        [15, 23, 12, 5], [47, 12, 15, 5], [93, 15, 13, 4], [196, 15, 17, 6], [229, 48, 12, 5],
+        [12, 90, 15, 5], [229, 152, 15, 6], [23, 215, 13, 5], [85, 230, 15, 5], [193, 227, 18, 7],
+      ];
+      for (const [cx, cz, radius, peak] of mesas) {
+        for (let z = Math.max(0, cz - radius); z <= Math.min(SIDE - 1, cz + radius); z++) {
+          for (let x = Math.max(0, cx - radius); x <= Math.min(SIDE - 1, cx + radius); x++) {
+            const distance = Math.hypot(x - cx, (z - cz) * 1.08);
+            if (distance > radius) continue;
+            const variation = hash(x >> 1, cz, z >> 1);
+            const height = Math.max(5, Math.min(peak + 3, 3 + Math.floor((radius - distance) * .85) + (variation > .82 ? 1 : 0)));
+            if (height <= 4) continue;
+            const color = distance < radius * .28 ? 'sandstone' : variation > .69 ? 'granite' : variation > .36 ? 'andesite' : 'tuff';
+            world.fillBox(x, 4, z, x, height, z, color);
+          }
+        }
+        for (let boulder = 0; boulder < 3; boulder++) {
+          const bx = Math.max(2, Math.min(SIDE - 3, cx + Math.floor((hash(cx, boulder + 21, cz) - .5) * radius * 1.2)));
+          const bz = Math.max(2, Math.min(SIDE - 3, cz + Math.floor((hash(cx, boulder + 33, cz) - .5) * radius * 1.2)));
+          const by = Math.max(4, 3 + Math.floor(radius * .35));
+          world.sphere(bx, by, bz, 2 + (boulder % 2), boulder === 1 ? 'granite' : 'andesite');
+        }
+      }
+
+      const dryRiver = [[238, 68], [222, 80], [218, 99], [232, 111], [215, 124], [229, 143], [238, 158]];
+      for (let path = 0; path < dryRiver.length - 1; path++) {
+        const start = dryRiver[path], finish = dryRiver[path + 1];
+        const steps = Math.ceil(Math.hypot(finish[0] - start[0], finish[1] - start[1]) * 1.8);
+        for (let step = 0; step <= steps; step++) {
+          const t = step / steps;
+          const cx = start[0] + (finish[0] - start[0]) * t;
+          const cz = start[1] + (finish[1] - start[1]) * t;
+          const halfWidth = 2.2 + hash(Math.round(cx), path, Math.round(cz)) * 2;
+          for (let x = Math.max(0, Math.floor(cx - halfWidth)); x <= Math.min(SIDE - 1, Math.ceil(cx + halfWidth)); x++) {
+            for (let z = Math.max(0, Math.floor(cz - halfWidth)); z <= Math.min(SIDE - 1, Math.ceil(cz + halfWidth)); z++) {
+              if (Math.hypot(x - cx, z - cz) <= halfWidth) {
+                world.del(x, 4, z);
+                world.set(x, 3, z, hash(x, path + 43, z) > .48 ? 'gravel' : 'mud');
+              }
+            }
+          }
+        }
+      }
+
+      const roadZ = 222;
+      for (let z = 195; z < SIDE; z++) {
+        const roadWidth = z > 224 ? 5 : 9;
+        for (let x = WORLD_CENTER - roadWidth; x <= WORLD_CENTER + roadWidth; x++) {
+          if (x < 0 || x >= SIDE) continue;
+          const wornEdge = Math.abs(x - WORLD_CENTER) > roadWidth - 2;
+          world.set(x, 4, z, wornEdge ? 'sandstone' : hash(x, roadZ, z) > .76 ? 'rubbed' : 'andesite');
+        }
+        if ((z - 195) % 7 === 0) {
+          world.set(WORLD_CENTER - 11, 5, z, 'gilt');
+          world.set(WORLD_CENTER + 11, 5, z, 'gilt');
+        }
+      }
+    }
+
+    function buildBronzeFloor() {
+      for (let z = 1; z <= 173; z++) {
+        for (let x = 1; x <= 173; x++) {
+          if (!ringShape(x, z, OUTER_WALL_RADIUS + 7)) continue;
+          const ornament = hash(x >> 2, 7, z >> 2);
+          const isRoad = Math.abs(x - LOCAL_CENTER) <= 3 || Math.abs(z - LOCAL_CENTER) <= 3;
+          let floor = ornament > .88 ? 'rubbed' : ornament < .10 ? 'oldCopper' : 'bronze';
+          if (isRoad && (x + z) % 9 === 0) floor = 'gilt';
+          world.set(x, 4, z, floor);
+          const streetAxis = (Math.abs(x - LOCAL_CENTER) <= 3 && (x === LOCAL_CENTER - 3 || x === LOCAL_CENTER + 3)) ||
+            (Math.abs(z - LOCAL_CENTER) <= 3 && (z === LOCAL_CENTER - 3 || z === LOCAL_CENTER + 3));
+          if (streetAxis && ornament > .36 && (x % 5 === 0 || z % 5 === 0)) world.set(x, 5, z, ornament > .79 ? 'gilt' : 'darkGilt');
+        }
+      }
+
+      for (let z = 24; z <= 150; z += 17) {
+        for (let x = 24; x <= 150; x += 17) {
+          const distance = squareRadius(x, z);
+          if (distance > OUTER_WALL_RADIUS - 3 || distance < INNER_WALL_RADIUS + 6) continue;
+          const size = 3 + Math.floor(hash(x, 82, z) * 3);
+          for (let offset = -size; offset <= size; offset++) {
+            for (const sign of [-1, 1]) {
+              const northSouth = size * size + offset * offset >= (size - 1) ** 2;
+              if (northSouth) {
+                world.set(x + offset, 5, z + sign * size, 'gilt');
+                world.set(x + sign * size, 5, z + offset, 'darkGilt');
+              }
+            }
+          }
+          if (hash(x, 29, z) > .35) {
+            world.set(x, 5, z, 'verdigris');
+            world.set(x + 1, 5, z, 'rubbed');
+          }
+        }
+      }
+
+      for (const [cx, cz, radius] of [[87, 87, 19], [37, 87, 12], [137, 87, 11], [87, 37, 11], [87, 137, 12]]) {
+        for (let degree = 0; degree < 360; degree += 5) {
+          const angle = degree * Math.PI / 180;
+          const x = Math.round(cx + Math.cos(angle) * radius);
+          const z = Math.round(cz + Math.sin(angle) * radius);
+          world.set(x, 5, z, degree % 30 === 0 ? 'gilt' : 'verdigris');
+          if (degree % 45 < 3) {
+            world.set(x + 1, 5, z, 'darkGilt');
+            world.set(x, 5, z + 1, 'rubbed');
+          }
+        }
+        world.set(cx, 5, cz, 'starLight');
+      }
+
+      for (let z = 28; z <= 146; z += 14) {
+        for (let x = 28; x <= 146; x += 14) {
+          const dx = Math.abs(x - 87), dz = Math.abs(z - 87);
+          if (Math.max(dx, dz) < 35 || Math.max(dx, dz) > 59 || hash(x, 91, z) < .7) continue;
+          octagonalMedallion(x, z, 5, 3, 0, 'gilt', 'rubbed');
+          world.set(x, 6, z, 'flame');
+        }
+      }
+
+    }
+
+    function buildCitadelTerraces() {
+      for (let z = 53; z <= 121; z++) {
+        for (let x = 53; x <= 121; x++) {
+          const distance = squareRadius(x, z);
+          if (distance > 32) continue;
+          const elevation = Math.floor((32 - distance) / 4) + 1;
+          const material = hash(x, 61, z) > .84 ? 'rubbed' : hash(x >> 1, 17, z >> 1) < .11 ? 'verdigris' : 'bronze';
+          world.fillBox(x, 5, z, x, 5 + elevation, z, material);
+          if (distance < 30 && (x + z) % 11 === 0) world.set(x, 6 + elevation, z, 'darkGilt');
+        }
+      }
+
+      for (let radius = 29; radius >= 6; radius -= 3) {
+        const y = 14 + Math.floor((29 - radius) * .43);
+        const outer = radius;
+        for (let z = 87 - outer; z <= 87 + outer; z++) {
+          for (let x = 87 - outer; x <= 87 + outer; x++) {
+            const distance = Math.max(Math.abs(x - 87), Math.abs(z - 87));
+            if (distance < outer - 2) continue;
+            const isCopper = hash(x, y, z) > .17;
+            world.fillBox(x, y, z, x, y + 1, z, isCopper ? 'gilt' : 'paleStone');
+          }
+        }
+      }
+
+      for (const z of [59, 115]) {
+        for (let x = 68; x <= 106; x++) {
+          world.fillBox(x, 15, z, x, 15, z + (z < 87 ? 1 : -1), x % 4 === 0 ? 'gilt' : 'paleStone');
+        }
+      }
+
+      for (const [cx, cz, radius, height, material] of [
+        [87, 87, 28, 12, 'obsidian'], [70, 70, 3, 17, 'rubbed'], [104, 70, 3, 17, 'rubbed'],
+        [70, 104, 3, 17, 'rubbed'], [104, 104, 3, 17, 'rubbed'],
+      ]) {
+        world.cylinder(cx, 14, cz, radius, height, material, true);
+      }
+    }
+
+    function buildWall(radius, yBase, wallHeight, gateWidth, isInner) {
+      const innerCut = 0.7;
+      const outerCut = 1.5;
+      const drawRadius = Math.ceil(radius + 5);
+      for (let z = 87 - drawRadius; z <= 87 + drawRadius; z++) {
+        for (let x = 87 - drawRadius; x <= 87 + drawRadius; x++) {
+          const distance = squareRadius(x, z);
+          if (distance < radius - innerCut || distance > radius + outerCut) continue;
+          const southSide = z > 87 && Math.abs(x - 87) <= gateWidth;
+          if (southSide) continue;
+          const northGate = z < 87 && Math.abs(x - 87) <= gateWidth - 2;
+          if (northGate) continue;
+          const westGate = x < 87 && Math.abs(z - 87) <= gateWidth - 4;
+          const eastGate = x > 87 && Math.abs(z - 87) <= gateWidth - 4;
+          if (westGate || eastGate) continue;
+          for (let dy = 0; dy < wallHeight; dy++) {
+            const y = yBase + dy;
+            const verticalBand = dy % 6 === 0 || dy === wallHeight - 1;
+            const masonry = verticalBand ? 'darkGilt' : 'bronze';
+            const skin = distance > radius + outerCut - 1.3 || distance < radius + innerCut + 1.1;
+            const seam = skin && (x + z * 3 + Math.floor(dy / 3)) % 17 === 0;
+            const patina = hash(x, Math.floor(y / 3), z);
+            world.set(x, y, z, seam ? 'gilt' : skin && patina > .86 ? 'verdigris' : skin && patina > .69 ? 'oldCopper' : masonry);
+          }
+          if (distance >= radius + outerCut - 1.3 && (x + z) % 6 === 0) {
+            for (let y = yBase + wallHeight; y <= yBase + wallHeight + 1; y++) world.set(x, y, z, 'gilt');
+          }
+        }
+      }
+
+      const towerPositions = isInner
+        ? [[87, 53], [108, 62], [121, 87], [108, 112], [87, 121], [66, 112], [53, 87], [66, 62]]
+        : [[87, 18], [138, 36], [156, 87], [138, 138], [87, 156], [36, 138], [18, 87], [36, 36]];
+      for (let index = 0; index < towerPositions.length; index++) {
+        if (index === 4 || !isInner && index === 0) continue;
+        const [cx, cz] = towerPositions[index];
+        buildWatchtower(cx, cz, yBase, wallHeight + (isInner ? 6 : 2), isInner ? 6 : 8, index);
+      }
+
+      for (let gate = 0; gate < 4; gate++) {
+        const [gateX, gateZ] = gate === 0 ? [87, 87 - radius] : gate === 1 ? [87 + radius, 87] : gate === 2 ? [87, 87 + radius] : [87 - radius, 87];
+        const towerReach = (isInner ? 6 : 6) + (isInner ? 8 : 5) + 2;
+        const towerRadius = isInner ? 8 : 6;
+        const towerHeight = wallHeight + (isInner ? 11 : 7);
+        const offsets = [-(towerReach), towerReach];
+        for (let support = 0; support < offsets.length; support++) {
+          const across = offsets[support];
+          const towerX = gateX + (gate % 2 === 0 ? across : 0);
+          const towerZ = gateZ + (gate % 2 === 0 ? 0 : across);
+          buildWatchtower(towerX, towerZ, yBase, towerHeight, towerRadius, gate + support + (isInner ? 8 : 0));
+        }
+        buildGate(gate, yBase, wallHeight, isInner);
+      }
+    }
+
+    function buildWatchtower(cx, cz, yBase, wallHeight, radius, variant) {
+      const yTop = yBase + wallHeight;
+      for (let y = yBase - 1; y <= yTop; y++) {
+        const width = radius + Math.floor(Math.max(0, y - (yTop - 5)) * .12);
+        for (let x = cx - width; x <= cx + width; x++) {
+          for (let z = cz - width; z <= cz + width; z++) {
+            const dx = Math.abs(x - cx), dz = Math.abs(z - cz);
+            if (Math.max(dx, dz) > width) continue;
+            const isWall = y <= yBase + 1 || y >= yTop - 3 || dx >= width - 1 || dz >= width - 1;
+            if (!isWall) continue;
+            const accent = dx === width || dz === width || y >= yTop - 1;
+            const chosen = accent ? ((variant + x + z) % 4 === 0 ? 'verdigris' : 'gilt') : 'bronze';
+            world.set(x, y, z, chosen);
+          }
+        }
+      }
+      for (let x = cx - radius - 1; x <= cx + radius + 1; x++) {
+        for (let z = cz - radius - 1; z <= cz + radius + 1; z++) {
+          const dx = Math.abs(x - cx), dz = Math.abs(z - cz);
+          if ((dx === radius + 1 || dz === radius + 1) && (x + z + variant) % 2 === 0) world.set(x, yTop + 1, z, 'gilt');
+        }
+      }
+      world.fillBox(cx, yTop - 2, cz, cx, yTop + 2, cz, 'lamp');
+      world.set(cx, yTop + 3, cz, 'starLight');
+    }
+
+    function buildGate(direction, yBase, wallHeight, isInner) {
+      const cx = 87, cz = 87;
+      const side = isInner ? 5 : 6;
+      const yTop = yBase + wallHeight + 2;
+      let northSouth;
+      if (direction === 0) northSouth = [cx, cz - (isInner ? INNER_WALL_RADIUS : OUTER_WALL_RADIUS)];
+      else if (direction === 1) northSouth = [cx + (isInner ? INNER_WALL_RADIUS : OUTER_WALL_RADIUS), cz];
+      else if (direction === 2) northSouth = [cx, cz + (isInner ? INNER_WALL_RADIUS : OUTER_WALL_RADIUS)];
+      else northSouth = [cx - (isInner ? INNER_WALL_RADIUS : OUTER_WALL_RADIUS), cz];
+      const [gx, gz] = northSouth;
+      const minSide = Math.max(0, Math.floor(gx - side));
+      const maxSide = Math.min(SIDE - 1, Math.ceil(gx + side));
+      for (let offset = -side; offset <= side; offset++) {
+        const leftX = direction % 2 === 0 ? gx + offset : gx - side;
+        const rightX = direction % 2 === 0 ? gx + offset : gx + side;
+        const leftZ = direction % 2 === 0 ? gz - side : gz + offset;
+        const rightZ = direction % 2 === 0 ? gz + side : gz + offset;
+        world.fillBox(leftX, yBase, leftZ, leftX, yBase + wallHeight + 3, leftZ, 'bronze');
+        world.fillBox(rightX, yBase, rightZ, rightX, yBase + wallHeight + 3, rightZ, 'bronze');
+        for (let rung = 0; rung < side * 2 + 1; rung++) {
+          const arcHeight = Math.round(Math.sqrt(Math.max(0, side * side - (offset - side) ** 2)) * .48);
+          const archY = yTop - 2 - arcHeight;
+          const x = direction % 2 === 0 ? gx + offset : gx + (offset < 0 ? -side : side);
+          const z = direction % 2 === 0 ? gz + (offset < 0 ? -side : side) : gz + offset;
+          if (rung < 1) continue;
+          world.set(x, archY + (rung % 2), z, 'gilt');
+        }
+      }
+      const approach = direction === 0 ? [0, -1] : direction === 1 ? [1, 0] : direction === 2 ? [0, 1] : [-1, 0];
+      for (let step = 0; step <= side + 3; step++) {
+        const x = gx + approach[0] * step, z = gz + approach[1] * step;
+        if (x < 2 || x > SIDE - 3 || z < 2 || z > SIDE - 3) continue;
+        const lineWidth = isInner ? 4 : 5;
+        for (let across = -lineWidth; across <= lineWidth; across++) {
+          const px = x + (approach[0] === 0 ? across : 0);
+          const pz = z + (approach[0] === 0 ? 0 : across);
+          world.set(px, yBase - 1, pz, step % 4 === 0 ? 'gilt' : 'rubbed');
+        }
+      }
+      world.fillBox(minSide, yTop + 2, Math.max(0, gz - side - 2), maxSide, yTop + 3, Math.min(SIDE - 1, gz + side + 2), isInner ? 'gilt' : 'oldCopper');
+    }
+
+    function buildTownhouse(cx, cz, index) {
+      const width = 7 + Math.floor(hash(index, 23, cx) * 2);
+      const depth = 7 + Math.floor(hash(cx, index, cz) * 3);
+      const height = 7 + Math.floor(hash(cz, index, cx) * 5);
+      const x0 = cx - Math.floor(width / 2), z0 = cz - Math.floor(depth / 2);
+      const x1 = x0 + width - 1, z1 = z0 + depth - 1;
+      world.fillBox(x0 - 1, 5, z0 - 1, x1 + 1, 6, z1 + 1, 'brick');
+      world.fillBox(x0, 7, z0, x1, 7, z1, 'cedar');
+      const roofMat = hash(index, 8, cz) > .51 ? 'roof' : 'tealRoof';
+
+      for (let y = 8; y <= 7 + height; y++) {
+        for (let x = x0; x <= x1; x++) {
+          for (let z = z0; z <= z1; z++) {
+            const outside = x === x0 || x === x1 || z === z0 || z === z1;
+            if (!outside) continue;
+            const corner = (x === x0 || x === x1) && (z === z0 || z === z1);
+            const lintel = y === 8 || y === 10 + height;
+            if (corner) {
+              world.set(x, y, z, y % 2 === 0 ? 'darkWood' : 'spruce');
+              continue;
+            }
+            if (lintel) {
+              world.set(x, y, z, 'darkWood');
+              continue;
+            }
+            const front = z === z0 || z === z1;
+            const towardStreet = z === z1;
+            const centered = Math.abs(x - cx) <= 1 && Math.abs(z - (towardStreet ? z1 : z0)) <= 0;
+            const windowFloor = y === 10 || y === 11 + Math.floor(height * .48);
+            const leaveWindow = front && centered && windowFloor && width >= 9;
+            if (leaveWindow) {
+              world.set(x, y, z, y % 2 === 0 ? 'water' : 'glass');
+              if (Math.abs(x - cx) === 1) world.set(x + (x === x0 ? 1 : x === x1 ? -1 : 0), y, z, 'cedar');
+            } else if (x % 3 === 0 || z % 3 === 0) {
+              world.set(x, y, z, 'chalk');
+            } else {
+              world.set(x, y, z, 'mud');
+            }
+          }
+        }
+      }
+
+      const balconyY = 11 + Math.floor(height * .47);
+      world.fillBox(cx - 3, balconyY, z1, cx + 3, balconyY, z1 + 2, 'cedar');
+      for (let x = cx - 3; x <= cx + 3; x++) {
+        world.set(x, balconyY + 1, z1 + 2, 'darkWood');
+        world.set(x, balconyY + 2, z1 + 2, 'spruce');
+      }
+      for (const x of [cx - 3, cx + 3]) world.fillBox(x, balconyY + 1, z1, x, balconyY + 2, z1 + 2, 'darkWood');
+      world.fillBox(cx - 2, 6, z0 + 2, cx + 2, 6, z0 + 2, 'darkWood');
+      world.set(cx, 9, z1 + 1, 'copper');
+
+      const ridgeY = 9 + height;
+      const overhang = 2;
+      for (let z = z0 - overhang; z <= z1 + overhang; z++) {
+        const roofRise = Math.max(0, 2 + Math.min(z - z0, z1 - z)) * .67;
+        const y = ridgeY + Math.min(3, Math.floor(roofRise));
+        const overWidth = z < z0 || z > z1 ? 1 : 2;
+        world.fillBox(x0 - overWidth, y, z, x1 + overWidth, y, z, hash(index, y, z) > .76 ? 'oldCopper' : roofMat);
+        if (y > ridgeY && Math.abs(z - (z0 + z1) / 2) < 2) {
+          world.set(cx - 1, y + 1, z, 'darkWood');
+          world.set(cx, y + 1, z, 'gilt');
+          world.set(cx + 1, y + 1, z, 'darkWood');
+        }
+      }
+      for (const [dx, dz] of [[x0 + 1, z0 + 1], [x1 - 1, z0 + 1]]) {
+        const chimneyTop = ridgeY + 5;
+        world.hollowBox(dx - 1, ridgeY - 1, dz - 1, dx + 1, chimneyTop, dz + 1, 'brick');
+        world.set(dx, chimneyTop + 1, dz, 'flame');
+      }
+
+      for (let x = cx - 2; x <= cx + 2; x += 2) {
+        world.fillBox(x, 6, z1 + 3, x, 7, z1 + 3, 'darkWood');
+      }
+      world.houseCount++;
+    }
+
+    function buildTown() {
+      let house = 0;
+      for (const [ring, firstAngle] of [[43, 15], [53, 30]]) {
+        for (let plot = 0; plot < 12; plot++) {
+          const degrees = firstAngle + plot * 30;
+          const angle = degrees * Math.PI / 180;
+          const jitter = (hash(plot, ring, 87) - .5) * 2.2;
+          const distance = ring + jitter;
+          const scale = Math.max(Math.abs(Math.cos(angle)), Math.abs(Math.sin(angle))) +
+            Math.min(Math.abs(Math.cos(angle)), Math.abs(Math.sin(angle))) * .39;
+          const radius = distance / scale;
+          const x = 87 + Math.cos(angle) * radius;
+          const z = 87 + Math.sin(angle) * radius;
+          buildTownhouse(Math.round(x), Math.round(z), house++);
+        }
+      }
+    }
+
+    function buildLampPost(x, z, baseY = 5, variant = 0) {
+      world.fillBox(x, baseY, z, x, baseY + 4 + (variant % 2), z, 'darkWood');
+      world.fillBox(x - 1, baseY + 3, z, x + 1, baseY + 3, z, 'gilt');
+      world.fillBox(x, baseY + 4 + (variant % 2), z - 1, x, baseY + 4 + (variant % 2), z + 1, 'gilt');
+      world.set(x, baseY + 5 + (variant % 2), z, variant % 3 === 0 ? 'starLight' : 'flame');
+      world.sphere(x, baseY + 3, z, 1, variant % 2 ? 'rubbed' : 'gilt');
+    }
+
+    function buildLanternBridge(cx, cz, alongX, baseY) {
+      const length = 13;
+      for (let offset = -length / 2; offset <= length / 2; offset++) {
+        for (let lane = -2; lane <= 2; lane++) {
+          const x = Math.round(cx + (alongX ? offset : lane));
+          const z = Math.round(cz + (alongX ? lane : offset));
+          const arch = Math.round(Math.sin(((offset + length / 2) / length) * Math.PI) * 2);
+          const y = baseY + arch;
+          world.set(x, y, z, lane === 0 ? 'gilt' : 'rubbed');
+          if (Math.abs(lane) === 2 && offset % 3 === 0) world.fillBox(x, y + 1, z, x, y + 2, z, 'oldCopper');
+        }
+      }
+      for (const offset of [-4, 4]) {
+        const x = Math.round(cx + (alongX ? offset : 0));
+        const z = Math.round(cz + (alongX ? 0 : offset));
+        buildLampPost(x, z, baseY + 2, Math.abs(offset));
+      }
+    }
+
+    function buildFountain(cx, cz, y) {
+      octagonalMedallion(cx, cz, y, 8, 0, 'gilt', 'paleStone');
+      octagonalMedallion(cx, cz, y + 1, 5, 0, 'rubbed', 'bronze');
+      for (let radius = 3; radius >= 1; radius--) {
+        world.cylinder(cx, y + 2, cz, radius, 1, radius === 1 ? 'water' : 'ice');
+      }
+      world.set(cx, y + 2, cz, 'starLight');
+      for (const angle of [0, 90, 180, 270]) {
+        const x = cx + Math.round(Math.cos(angle * Math.PI / 180) * 4);
+        const z = cz + Math.round(Math.sin(angle * Math.PI / 180) * 4);
+        world.fillBox(x, y + 1, z, x, y + 3, z, 'gilt');
+      }
+    }
+
+    function buildTemplePavilion(cx, cz, floorY, halfSize, levels, roofMaterial, index) {
+      const x0 = cx - halfSize, x1 = cx + halfSize, z0 = cz - halfSize, z1 = cz + halfSize;
+      world.fillBox(x0 - 2, floorY - 2, z0 - 2, x1 + 2, floorY, z1 + 2, 'brick');
+      world.fillBox(x0 - 1, floorY + 1, z0 - 1, x1 + 1, floorY + 1, z1 + 1, 'rubbed');
+      world.fillBox(x0, floorY + 2, z0, x1, floorY + 2, z1, 'cedar');
+      world.hollowBox(x0, floorY + 3, z0, x1, floorY + levels, z1, 'chalk');
+
+      for (let x = x0 - 1; x <= x1 + 1; x++) {
+        for (let z = z0 - 1; z <= z1 + 1; z++) {
+          const corner = (x === x0 - 1 || x === x1 + 1) && (z === z0 - 1 || z === z1 + 1);
+          if (!corner && x !== cx && z !== cz) continue;
+          world.fillBox(x, floorY + 3, z, x, floorY + levels + 1, z, corner ? 'darkGilt' : 'gilt');
+        }
+      }
+
+      for (let layer = 0; layer < 4; layer++) {
+        const inset = 3 - Math.min(3, layer);
+        const y = floorY + levels + layer + 1;
+        world.fillBox(x0 - inset, y, z0 - inset, x1 + inset, y, z1 + inset, layer % 2 ? roofMaterial : 'gilt');
+        for (let x = x0 - inset; x <= x1 + inset; x += 3) {
+          world.set(x, y, z0 - inset, 'verdigris');
+          world.set(x, y, z1 + inset, 'verdigris');
+        }
+      }
+      world.fillBox(cx - 1, floorY + levels + 5, cz - 1, cx + 1, floorY + levels + 6, cz + 1, 'gilt');
+      world.set(cx, floorY + levels + 7, cz, index % 3 === 0 ? 'starLight' : 'flame');
+
+      const doorX = cx, doorZ = cz + halfSize;
+      world.fillBox(doorX - 1, floorY + 3, doorZ, doorX + 1, floorY + 6, doorZ, 'water');
+      world.set(doorX - 2, floorY + 7, doorZ, 'gilt');
+      world.set(doorX + 2, floorY + 7, doorZ, 'gilt');
+      buildLampPost(cx - halfSize - 2, cz + halfSize, floorY + 2, index);
+      buildLampPost(cx + halfSize + 2, cz + halfSize, floorY + 2, index + 1);
+    }
+
+    function buildWorldTree() {
+      const cx = 87, cz = 87, base = 18;
+      const roots = [
+        [[0, 0], [20, 3]], [[0, 0], [-21, -4]], [[0, 0], [4, 21]], [[0, 0], [-4, -21]],
+        [[0, 0], [16, 14]], [[0, 0], [-17, 15]], [[0, 0], [17, -15]], [[0, 0], [-16, -15]],
+      ];
+      for (let root = 0; root < roots.length; root++) {
+        const [endX, endZ] = roots[root][1];
+        const width = root % 2 === 0 ? 3.6 : 2.8;
+        world.beam(cx, base + 4, cz, cx + endX, base + 1, cz + endZ, width, root % 3 === 0 ? 'paleStone' : 'chalk');
+        world.beam(cx, base + 5, cz, cx + endX, base + 3, cz + endZ, .8, root % 2 ? 'gilt' : 'rubbed');
+      }
+
+      for (let y = base; y <= 79; y++) {
+        const progress = (y - base) / 63;
+        const radius = y < 32 ? 8 - progress * 2 : 5.2 - progress * 2;
+        world.cylinder(cx, y, cz, Math.max(3, Math.floor(radius)), 1, y % 9 === 0 ? 'paleStone' : 'chalk');
+      }
+
+      for (let tendril = 0; tendril < 7; tendril++) {
+        const phase = tendril * Math.PI * 2 / 7;
+        for (let y = base + 3; y <= 82; y++) {
+          const t = (y - base - 3) / 79;
+          const angle = phase + t * Math.PI * 4.2;
+          const radial = 3.3 + 2.6 * Math.sin(t * Math.PI);
+          const x = cx + Math.cos(angle) * radial;
+          const z = cz + Math.sin(angle) * radial;
+          const size = Math.max(1.35, 2.25 - t * .8);
+          world.beam(x, y, z, x + Math.cos(angle) * 1.15, y + 1, z + Math.sin(angle) * 1.15, size, (y + tendril) % 8 === 0 ? 'paleStone' : 'chalk');
+          if (y % 13 === tendril % 13) world.set(Math.round(x * 1.2), y, Math.round(z), 'darkGilt');
+        }
+      }
+
+      const branches = [
+        [67, 37, 74, 2.6], [107, 40, 72, 2.7], [64, 46, 97, 2.4], [109, 54, 102, 2.8],
+        [69, 66, 65, 2.4], [107, 74, 74, 2.6], [62, 84, 87, 2.4], [113, 91, 93, 2.9],
+        [76, 99, 103, 2.2], [98, 106, 80, 2.2], [86, 103, 110, 1.8], [110, 83, 109, 2.1],
+        [64, 75, 110, 2.1], [112, 60, 64, 2.4], [77, 87, 62, 1.9],
+      ];
+
+      for (let limb = 0; limb < branches.length; limb++) {
+        const [endX, endY, endZ, width] = branches[limb];
+        const branchLift = endY < 65 ? endY - 8 : endY - 13;
+        const startPhase = limb * Math.PI * 2 / 7;
+        const shoulderX = cx + Math.cos(startPhase) * 6;
+        const shoulderZ = cz + Math.sin(startPhase) * 6;
+        world.beam(cx, branchLift - 4, cz, shoulderX, branchLift, shoulderZ, width + .9, 'paleStone');
+        world.beam(shoulderX, branchLift, shoulderZ, endX, endY - 2, endZ, width, limb % 3 === 0 ? 'paleStone' : 'chalk');
+        world.beam(shoulderX + 1, branchLift + 1, shoulderZ, endX, endY - 1, endZ - 1, .75, 'rubbed');
+
+        const cabinSize = limb > 9 ? 3 : 4;
+        const cabinHeight = limb > 9 ? 7 : 8;
+        const floorY = endY - 2;
+        world.fillBox(endX - cabinSize - 2, floorY - 2, endZ - cabinSize - 2,
+          endX + cabinSize + 2, floorY - 1, endZ + cabinSize + 2, 'paleStone');
+        world.hollowBox(endX - cabinSize, floorY, endZ - cabinSize,
+          endX + cabinSize, floorY + cabinHeight, endZ + cabinSize, limb % 4 === 0 ? 'chalk' : 'paleStone');
+        world.fillBox(endX - 1, floorY + 2, endZ + cabinSize, endX + 1, floorY + 4, endZ + cabinSize, 'water');
+
+        for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+          const px = endX + dx * (cabinSize - 1), pz = endZ + dz * (cabinSize - 1);
+          world.fillBox(px, floorY + 1, pz, px, floorY + cabinHeight + 1, pz, 'chalk');
+        }
+
+        for (let roof = 0; roof < 5; roof++) {
+          const inset = 4 - Math.min(4, roof);
+          const roofY = floorY + cabinHeight + 1 + roof;
+          world.fillBox(endX - cabinSize - 1 + inset, roofY, endZ - cabinSize - 1 + inset,
+            endX + cabinSize + 1 - inset, roofY, endZ + cabinSize + 1 - inset,
+            roof % 2 === 0 ? 'rubbed' : 'gilt');
+          if (roof < 3) {
+            for (let angle = 0; angle < 4; angle++) {
+              const px = endX + (angle < 2 ? -1 : 1) * (cabinSize - roof);
+              const pz = endZ + (angle % 2 ? 1 : -1) * (cabinSize - roof);
+              world.set(px, roofY, pz, 'verdigris');
+            }
+          }
+        }
+        world.fillBox(endX - 1, floorY + cabinHeight + 6, endZ - 1,
+          endX + 1, floorY + cabinHeight + 7, endZ + 1, 'gilt');
+        world.set(endX, floorY + cabinHeight + 8, endZ, limb % 4 === 0 ? 'starLight' : 'flame');
+
+        const balconyY = floorY + 2;
+        for (let x = endX - cabinSize - 2; x <= endX + cabinSize + 2; x++) {
+          for (const z of [endZ + cabinSize + 2, endZ - cabinSize - 2]) {
+            world.set(x, balconyY, z, 'rubbed');
+            if ((x + z) % 2 === 0) world.fillBox(x, balconyY + 1, z, x, balconyY + 2, z, 'gilt');
+          }
+        }
+      }
+
+      for (const [cx2, cz2, y, radius] of [[87, 87, 27, 12], [87, 87, 44, 11], [87, 87, 60, 10], [87, 87, 76, 7], [87, 87, 91, 4]]) {
+        circle(cx2, y, cz2, radius, y % 2 === 0 ? 'rubbed' : 'paleStone');
+        circle(cx2, y + 1, cz2, radius - 2, 'verdigris');
+      }
+
+      const crown = [[87, 131, 87], [80, 116, 92], [95, 114, 78], [94, 121, 97], [78, 120, 79]];
+      for (let spire = 0; spire < crown.length; spire++) {
+        const [x, tip, z] = crown[spire];
+        const dx = x - cx, dz = z - cz;
+        world.beam(cx + dx * .38, 71, cz + dz * .38, x, tip - 3, z, spire === 0 ? 2.1 : 1.5, 'paleStone');
+        world.hollowBox(x - 3, tip - 8, z - 3, x + 3, tip - 3, z + 3, 'chalk');
+        world.fillBox(x - 4, tip - 2, z - 4, x + 4, tip - 2, z + 4, 'gilt');
+        world.set(x, tip - 1, z, 'flame');
+        world.fillBox(x - 1, tip - 9, z, x + 1, tip - 9, z, 'starLight');
+      }
+      world.cylinder(cx, 94, cz, 2, 10, 'chalk');
+      world.fillBox(cx - 1, 103, cz - 1, cx + 1, 104, cz + 1, 'gilt');
+      world.set(cx, 105, cz, 'starLight');
+    }
+
+    function buildShrines() {
+      const littleTemples = [
+        [68, 71, 19, 5, 8, 'tealRoof'], [105, 71, 19, 5, 8, 'roof'],
+        [68, 103, 20, 6, 8, 'tealRoof'], [106, 103, 18, 5, 7, 'roof'],
+        [76, 61, 18, 4, 7, 'roof'], [100, 113, 18, 4, 7, 'tealRoof'],
+      ];
+      for (let index = 0; index < littleTemples.length; index++) {
+        const [x, z, y, half, height, roofMaterial] = littleTemples[index];
+        buildTemplePavilion(x, z, y, half, height, roofMaterial, index);
+      }
+
+      for (const [cx, cz, y] of [[87, 87, 14], [68, 87, 15], [106, 87, 15], [87, 67, 15], [87, 107, 15]]) {
+        buildFountain(cx, cz, y);
+      }
+
+      steppedPyramid(87, 87, 15, 15, 8, 'rubbed');
+      steppedPyramid(87, 87, 17, 8, 3, 'gilt');
+      world.hollowBox(80, 18, 80, 94, 29, 94, 'paleStone');
+      for (const [x, z] of [[80, 80], [94, 80], [80, 94], [94, 94]]) {
+        world.fillBox(x, 18, z, x, 31, z, 'gilt');
+        world.fillBox(x - 1, 32, z - 1, x + 1, 33, z + 1, 'oldCopper');
+        world.set(x, 34, z, 'flame');
+      }
+
+      for (let step = 0; step < 16; step++) {
+        const z = 115 - step * 2;
+        const y = 15 + Math.min(step >> 2, 4);
+        world.fillBox(82, y, z, 92, y, z + 1, step % 4 === 0 ? 'gilt' : 'paleStone');
+        world.set(80, y + 1, z, step % 4 === 0 ? 'flame' : 'rubbed');
+        world.set(94, y + 1, z, step % 4 === 0 ? 'flame' : 'rubbed');
+      }
+    }
+
+    function buildBridgesAndDistricts() {
+      const lamps = [[35, 54], [50, 36], [119, 39], [137, 54], [138, 119], [116, 138], [54, 137], [36, 118]];
+      for (let index = 0; index < lamps.length; index++) buildLampPost(lamps[index][0], lamps[index][1], 5, index);
+
+      for (const [x, z, alongX, y] of [
+        [44, 66, true, 5], [130, 67, false, 5], [48, 112, false, 5],
+        [128, 107, true, 5], [87, 34, true, 5], [87, 140, true, 5],
+        [162, 86, false, 4], [13, 91, false, 4], [87, 157, true, 4],
+      ]) buildLanternBridge(x, z, alongX, y);
+
+      for (const z of [50, 62, 74, 100, 112, 124, 37, 137]) {
+        for (const x of [36, 48, 126, 138]) {
+          const distance = squareRadius(x, z);
+          if (distance < 35 || distance > 57 || hash(x, z, 101) < .74) continue;
+          buildLampPost(x, z, 5, Math.round(hash(x, 61, z) * 5));
+        }
+      }
+
+      for (const [cx, cz, y] of [[43, 87, 6], [131, 87, 6], [87, 43, 6], [87, 131, 6]]) {
+        for (const radius of [5, 4, 3]) {
+          circle(cx, y + 1, cz, radius, radius === 5 ? 'rubbed' : radius === 4 ? 'darkGilt' : 'gilt');
+        }
+        world.set(cx, y + 2, cz, 'flame');
+      }
+    }
+
+    world.setCoordinateSpace(0, 0);
+    buildDesert();
+    world.setCoordinateSpace(LOCAL_CENTER, WORLD_CENTER);
+    world.setBuildingScale(1.34, 1.18);
+    buildBronzeFloor();
+    buildCitadelTerraces();
+    buildWall(62, 5, 16, 6, false);
+    buildWall(31, 12, 16, 5, true);
+    buildTown();
+    buildBridgesAndDistricts();
+    buildShrines();
+    buildWorldTree();
+
+    window.__VOXEL_DATA__ = world.exportData();
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color('#111713');
+    scene.fog = new THREE.Fog('#111713', 320, 830);
+    const { center, size } = world.mountToScene(scene);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance', alpha: false });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.22;
+    document.body.prepend(renderer.domElement);
+
+    const camera = new THREE.PerspectiveCamera(34, window.innerWidth / window.innerHeight, .1, 1200);
+    camera.position.set(center.x + 330, center.y + 375, center.z + 330);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.copy(center);
+    controls.enableDamping = true;
+    controls.dampingFactor = .055;
+    controls.minDistance = 120;
+    controls.maxDistance = 730;
+    controls.maxPolarAngle = Math.PI * .49;
+
+    const sky = new THREE.HemisphereLight('#e3dfc8', '#505847', 2.45);
+    scene.add(sky);
+    const sun = new THREE.DirectionalLight('#ffe1ac', 3.3);
+    sun.position.set(center.x - 120, 245, center.z + 170);
+    scene.add(sun);
+    const fill = new THREE.DirectionalLight('#86a49a', .95);
+    fill.position.set(center.x + 150, 100, center.z - 160);
+    scene.add(fill);
+
+    const dust = new THREE.Group();
+    for (let index = 0; index < 95; index++) {
+      const dot = new THREE.Mesh(
+        new THREE.BoxGeometry(.14 + hash(index, 7, 3) * .2, .14 + hash(index, 5, 11) * .18, .14),
+        new THREE.MeshBasicMaterial({ color: index % 5 === 0 ? '#dda965' : '#a5ad93', transparent: true, opacity: .24 })
+      );
+      dot.position.set(hash(index, 71, 23) * SIDE, 9 + hash(index, 87, 17) * 72, hash(index, 19, 143) * SIDE);
+      dust.add(dot);
+    }
+    scene.add(dust);
+
+    renderer.setAnimationLoop(() => {
+      controls.update();
+      dust.rotation.y = Math.sin(performance.now() * .000035) * .018;
+      renderer.render(scene, camera);
+    });
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    });
+
+    document.getElementById('stat-size').textContent = `${size.x} × ${size.z} × ${size.y}`;
+    document.getElementById('stat-people').textContent = `${world.houseCount} FOUNDATIONS`;
+    document.getElementById('stat-height').textContent = `${size.y} STONE TIERS`;
+    document.getElementById('stat-height').title = 'The central stone spire reaches Minecraft Y=152.';
+    document.getElementById('stat-people').title = `${world.houseCount} individually designed dwellings.`;
+    document.getElementById('stat-size').title = `${window.__VOXEL_DATA__.voxels.length.toLocaleString()} individually placed blocks.`;
+    document.querySelector('.coordinates').textContent =
+      `THE HIGH WASTES  ·  ${world.activeVoxelCount.toLocaleString()} CARVED BLOCKS  ·  COMPLETE BEDROCK`;
+  </script>
+</body>
+</html>

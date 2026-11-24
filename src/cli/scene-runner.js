@@ -120,16 +120,57 @@ function buildShimmedThree(capturedScenes) {
       this.toneMapping = 0;
       this.toneMappingExposure = 1.0;
       this.outputColorSpace = '';
+      this.coordinateSystem = RealTHREE.WebGLCoordinateSystem;
+      this._clearColor = new RealTHREE.Color(0x000000);
+      this._clearAlpha = 1;
     }
     setSize() {}
     setPixelRatio() {}
     setClearColor() {}
     setClearAlpha() {}
+    getClearColor(target) {
+      if (target && typeof target.copy === 'function') target.copy(this._clearColor);
+      return this._clearColor;
+    }
+    getClearAlpha() {
+      return this._clearAlpha;
+    }
+    getRenderTarget() {
+      return null;
+    }
+    setRenderTarget() {}
+    getActiveCubeFace() {
+      return 0;
+    }
+    getActiveMipmapLevel() {
+      return 0;
+    }
+    getContext() {
+      return createChainableStub();
+    }
     setAnimationLoop(cb) {
       // Run a single setup tick if animation loop builds dynamic state, but never loop infinitely
       this._loopCb = cb;
     }
     render() {}
+    dispose() {}
+  }
+
+  class DummyPMREMGenerator {
+    constructor() {
+      this._renderTarget = new RealTHREE.WebGLRenderTarget(1, 1);
+    }
+    fromScene() {
+      return this._renderTarget;
+    }
+    fromEquirectangular() {
+      return this._renderTarget;
+    }
+    fromCubemap() {
+      return this._renderTarget;
+    }
+    compileCubemapShader() {}
+    compileEquirectangularShader() {}
     dispose() {}
   }
 
@@ -160,6 +201,7 @@ function buildShimmedThree(capturedScenes) {
       if (prop === 'WebGLRenderer' || prop === 'WebGPURenderer') return DummyWebGLRenderer;
       if (prop === 'OrbitControls') return DummyControls;
       if (prop === 'RoundedBoxGeometry') return RoundedBoxGeometry;
+      if (prop === 'PMREMGenerator') return DummyPMREMGenerator;
       return Reflect.get(target, prop, receiver);
     },
   });

@@ -1,0 +1,37 @@
+{
+  "id": "铸枝之城-古代青铜巨树城邦-a91a",
+  "name": "铸枝之城 · 古代青铜巨树城邦",
+  "sourceExt": "litematic",
+  "tags": [],
+  "favorite": false,
+  "dimensions": {
+    "width": 180,
+    "height": 200,
+    "length": 180
+  },
+  "blockCount": 315910,
+  "materialCount": 19,
+  "config": {
+    "versionPreset": "1.21",
+    "scaleMode": "auto",
+    "targetSize": 64,
+    "useSlabs": true,
+    "hollowInterior": true,
+    "excludeGravity": true,
+    "survivalFriendly": true,
+    "preferScene": false,
+    "preferLightBlocks": false,
+    "brightness": 8,
+    "saturation": 85,
+    "ditherStrength": 15,
+    "disabledBlocks": [],
+    "disabledFamilies": [
+      "wool"
+    ],
+    "blockOverrides": {
+      "minecraft:stone_bricks": "minecraft:calcite"
+    }
+  },
+  "createdAt": 1795164395699,
+  "updatedAt": 1795164395699
+}

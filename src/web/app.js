@@ -24,6 +24,7 @@ import {
   raycastVoxelDDA,
   updateVoxelSceneHighlight,
 } from '/src/web/voxel-renderer.js';
+import { diagnoseModelInput } from './model-diagnostics.js';
 
 // ==================== DOM References ====================
 const activeAssetBadge = document.getElementById('activeAssetBadge');
@@ -59,6 +60,13 @@ const sourcePane = document.getElementById('sourcePane');
 const sourcePlaceholder = document.getElementById('sourcePlaceholder');
 const mcCanvasHost = document.getElementById('mcCanvasHost');
 const statsBadge = document.getElementById('statsBadge');
+const diagnoseModelBtn = document.getElementById('diagnoseModelBtn');
+const modelDiagnosticReport = document.getElementById('modelDiagnosticReport');
+const modelDiagnosticSummary = document.getElementById('modelDiagnosticSummary');
+const modelDiagnosticFindings = document.getElementById('modelDiagnosticFindings');
+const applyGenericRepairBtn = document.getElementById('applyGenericRepairBtn');
+const undoGenericRepairBtn = document.getElementById('undoGenericRepairBtn');
+const modelRepairMemoryNote = document.getElementById('modelRepairMemoryNote');
 
 // Viewport HUD
 const syncCamBtn = document.getElementById('syncCamBtn');
@@ -218,6 +226,9 @@ const state = {
   rawBinaryBase64: null,
   voxelData: null,
   capturedScene: null,
+  inMemoryRepair: null,
+  lastDiagnosis: null,
+  sourceError: null,
   importedGrid: null,
   currentGrid: null,
   cellLookup: null,
@@ -266,6 +277,7 @@ const state = {
 };
 
 let toastTimer = null;
+let sourceExtractSession = 0;
 function showToast(msg, duration = 2800) {
   toastEl.textContent = msg;
   toastEl.classList.remove('hidden');
@@ -1478,6 +1490,7 @@ async function maybeCacheActiveAssetWebglThumb() {
 
 async function openAssetFromLibrary(asset) {
   try {
+    resetModelDiagnosisUI();
     if (asset.config) {
       applyConfigSnapshot(asset.config);
     } else {
@@ -1498,6 +1511,9 @@ async function openAssetFromLibrary(asset) {
       state.sourceExt = ext;
       const decoded = ext === 'schem' ? await decodeSpongeSchem(u8) : await decodeLitematic(u8);
       state.sourceKind = 'litematic';
+      state.inMemoryRepair = null;
+      state.lastDiagnosis = null;
+      state.sourceError = null;
       state.importedGrid = decoded;
       state.previewDeferred = true;
       state.highlightedBlockId = null;
@@ -1520,6 +1536,9 @@ async function openAssetFromLibrary(asset) {
     if (ext === 'json') {
       const parsed = JSON.parse(text);
       state.sourceKind = 'json';
+      state.inMemoryRepair = null;
+      state.lastDiagnosis = null;
+      state.sourceError = null;
       state.rawHtml = text;
       state.voxelData = parsed;
       state.capturedScene = null;
@@ -1926,17 +1945,21 @@ function rebuildSchematic(resetCam = false) {
     return;
   }
 
-  const opts = getConversionOptions();
-  const useStructured =
-    !preferSceneChk.checked &&
-    state.voxelData &&
-    (Array.isArray(state.voxelData) || Array.isArray(state.voxelData.voxels));
+  const repair = state.inMemoryRepair;
+  const opts = { ...getConversionOptions(), ...(repair?.options || {}) };
+  const useStructured = repair
+    ? Boolean(repair.voxelData)
+    : !preferSceneChk.checked &&
+      state.voxelData &&
+      (Array.isArray(state.voxelData) || Array.isArray(state.voxelData.voxels));
 
   let extracted;
-  if (useStructured) {
-    extracted = extractStructuredVoxels(state.voxelData, opts);
+  if (repair?.forceScene && repair.scene) {
+    extracted = extractSceneVoxels(repair.scene, { ...opts, ignoreBackdrop: true });
+  } else if (useStructured) {
+    extracted = extractStructuredVoxels(repair?.voxelData || state.voxelData, opts);
   } else if (state.capturedScene) {
-    extracted = extractSceneVoxels(state.capturedScene, opts);
+    extracted = extractSceneVoxels(state.capturedScene, { ...opts, ignoreBackdrop: true });
   } else if (state.voxelData) {
     extracted = extractStructuredVoxels(state.voxelData, opts);
   } else {
@@ -2012,6 +2035,20 @@ function prepareBridgedHtml(rawSource) {
   }
 }
 </script>`;
+  const diagnosticsPrelude = `<script>
+window.__T2L_DIAGNOSTICS__ ||= { errors: [] };
+const recordT2LError = (message) => {
+  if (window.__T2L_DIAGNOSTICS__.errors.length < 12) {
+    window.__T2L_DIAGNOSTICS__.errors.push(String(message || '未知脚本错误'));
+  }
+};
+window.addEventListener('error', (event) => {
+  recordT2LError(event.message || event.target?.src || '脚本或资源加载失败');
+}, true);
+window.addEventListener('unhandledrejection', (event) => {
+  recordT2LError(event.reason?.message || event.reason || '未处理的异步错误');
+});
+</script>`;
   const cleanPreviewScript = '<script src="/src/web/scene-preview.js"></script>';
 
   if (/<script[^>]*type=["']importmap["'][^>]*>[\s\S]*?<\/script>/i.test(html)) {
@@ -2025,6 +2062,16 @@ function prepareBridgedHtml(rawSource) {
     html = `${bridgeImportMap}\n${html}`;
   }
 
+  if (!html.includes('window.__T2L_DIAGNOSTICS__')) {
+    if (html.includes(bridgeImportMap)) {
+      html = html.replace(bridgeImportMap, `${bridgeImportMap}\n${diagnosticsPrelude}`);
+    } else if (/<head[^>]*>/i.test(html)) {
+      html = html.replace(/<head[^>]*>/i, (m) => `${m}\n${diagnosticsPrelude}`);
+    } else {
+      html = `${diagnosticsPrelude}\n${html}`;
+    }
+  }
+
   if (/<\/body>/i.test(html)) {
     html = html.replace(/<\/body>/i, `${cleanPreviewScript}\n</body>`);
   } else {
@@ -2034,7 +2081,67 @@ function prepareBridgedHtml(rawSource) {
   return html;
 }
 
+function getSourceSceneStats(scene) {
+  const stats = {
+    meshCount: 0,
+    instanceCount: 0,
+    vertexCount: 0,
+    maxHorizontalSpan: 0,
+    hasDepth: false,
+    substantive: false,
+  };
+  if (!scene?.traverse) return stats;
+
+  scene.traverse((obj) => {
+    if (!obj.isMesh && !obj.isInstancedMesh) return;
+    if (obj.visible === false) return;
+
+    const material = Array.isArray(obj.material) ? obj.material[0] : obj.material;
+    // Skip full-screen sky domes / back-side backdrops.
+    if (material?.side === 1) return;
+    if (/sky|skybox|skydome|stars|cloud_dome/i.test(obj.name || '')) return;
+
+    stats.meshCount++;
+    const instanceCount = obj.isInstancedMesh ? (obj.count || 0) : 0;
+    stats.instanceCount += instanceCount;
+    stats.vertexCount += obj.geometry?.attributes?.position?.count || instanceCount || 0;
+
+    // A lone non-instanced mesh is often a ground disk or a placeholder.
+    // Only measure its vertical extent while the scene is still small.
+    if (!obj.isInstancedMesh && stats.meshCount <= 5) {
+      try {
+        const box = new THREE.Box3().setFromObject(obj);
+        const horizontalSpan = Math.max(box.max.x - box.min.x, box.max.z - box.min.z);
+        if (horizontalSpan > stats.maxHorizontalSpan) {
+          stats.maxHorizontalSpan = horizontalSpan;
+        }
+        if (box.max.y - box.min.y > 1.5) stats.hasDepth = true;
+      } catch {
+        // Ignore malformed geometry; the counts above still drive the heuristic.
+      }
+    }
+  });
+
+  stats.substantive =
+    stats.instanceCount > 0 ||
+    stats.meshCount >= 2 ||
+    stats.hasDepth ||
+    (stats.meshCount === 1 && stats.maxHorizontalSpan > 0 && stats.maxHorizontalSpan <= 256);
+  return stats;
+}
+
+function resetModelDiagnosisUI() {
+  state.inMemoryRepair = null;
+  state.lastDiagnosis = null;
+  state.sourceError = null;
+  modelDiagnosticReport.classList.add('hidden');
+  applyGenericRepairBtn.disabled = true;
+  undoGenericRepairBtn.classList.add('hidden');
+  modelRepairMemoryNote.textContent = '修复需你确认；只缓存于本次工作台内存，不改写原始文件。';
+}
+
 function loadHtmlScene(rawHtml, suggestedName = '', { keepAssetBinding = false } = {}) {
+  resetModelDiagnosisUI();
   if (!keepAssetBinding) {
     state.currentAssetId = null;
     updateActiveAssetHeaderUI();
@@ -2066,18 +2173,31 @@ function loadHtmlScene(rawHtml, suggestedName = '', { keepAssetBinding = false }
   sourcePane.classList.add('clean-scene-preview');
 
   const bridged = prepareBridgedHtml(rawHtml);
-  let extractedOnce = false;
+  const session = ++sourceExtractSession;
+  let hasExtracted = false;
+  let extractedSignature = '';
+  let extractedStats = { meshCount: 0, instanceCount: 0, vertexCount: 0 };
   let lastSceneSignature = '';
   let stableSceneReads = 0;
 
-  const tryExtractFromIframe = () => {
-    if (extractedOnce) return;
+  const tryExtractFromIframe = (force = false) => {
+    if (session !== sourceExtractSession) return;
+    if (state.inMemoryRepair?.sourceSession === session) return;
     const win = sourceFrame.contentWindow;
     if (!win) return;
 
+    state.sourceError = win.__T2L_DIAGNOSTICS__?.errors?.slice(-3).join(' · ') || state.sourceError;
+
     win.__ON_SOURCE_CAMERA_CHANGE__ = syncSourceToMc;
 
-    const vData = win.__VOXEL_DATA__ || null;
+    const rawVoxelData = win.__VOXEL_DATA__ || null;
+    const hasVoxelData = Boolean(
+      rawVoxelData &&
+        (Array.isArray(rawVoxelData)
+          ? rawVoxelData.length > 0
+          : Array.isArray(rawVoxelData.voxels) && rawVoxelData.voxels.length > 0)
+    );
+    const vData = hasVoxelData ? rawVoxelData : null;
     let scene = win.__CAPTURED_SCENE__ || win.scene || null;
     if (!scene && Array.isArray(win.__CAPTURED_SCENES__) && win.__CAPTURED_SCENES__.length > 0) {
       scene = win.__CAPTURED_SCENES__[win.__CAPTURED_SCENES__.length - 1];
@@ -2085,25 +2205,39 @@ function loadHtmlScene(rawHtml, suggestedName = '', { keepAssetBinding = false }
 
     if (!vData && !scene) return;
 
-    let meshCount = 0;
-    let vertexCount = 0;
-    if (scene?.traverse) {
-      scene.traverse((obj) => {
-        if (!obj.isMesh && !obj.isInstancedMesh) return;
-        meshCount++;
-        vertexCount += obj.geometry?.attributes?.position?.count || obj.count || 0;
-      });
-    }
-    const signature = `${meshCount}:${vertexCount}`;
-    if (signature === lastSceneSignature && meshCount > 0) {
-      stableSceneReads++;
-    } else {
-      stableSceneReads = 0;
-      lastSceneSignature = signature;
-    }
-    if (!vData && stableSceneReads < 2) return;
+    const stats = getSourceSceneStats(scene);
+    const signature = vData
+      ? `voxel:${Array.isArray(vData) ? vData.length : vData.voxels.length}:${vData.name || ''}`
+      : `${stats.meshCount}:${stats.instanceCount}:${stats.vertexCount}`;
 
-    extractedOnce = true;
+    if (!vData) {
+      if (signature === lastSceneSignature && stats.meshCount > 0) {
+        stableSceneReads++;
+      } else {
+        stableSceneReads = 0;
+        lastSceneSignature = signature;
+      }
+
+      // Do not lock onto a static ground disk / sky placeholder. Instanced
+      // builds tend to arrive as one complete batch, so one stable read is
+      // enough; ordinary mesh scenes still need two stable reads.
+      const requiredStableReads = stats.instanceCount > 0 ? 1 : 2;
+      if (!force && (stableSceneReads < requiredStableReads || !stats.substantive)) {
+        return;
+      }
+    }
+
+    const materiallyChanged = vData
+      ? signature !== extractedSignature
+      : stats.instanceCount > extractedStats.instanceCount ||
+        stats.meshCount > extractedStats.meshCount ||
+        stats.vertexCount > extractedStats.vertexCount * 1.05;
+    if (hasExtracted && !materiallyChanged) return;
+
+    const isFirstExtraction = !hasExtracted;
+    hasExtracted = true;
+    extractedSignature = signature;
+    extractedStats = stats;
     state.voxelData = vData;
     state.capturedScene = scene;
 
@@ -2115,6 +2249,9 @@ function loadHtmlScene(rawHtml, suggestedName = '', { keepAssetBinding = false }
     try {
       rebuildSchematic(true);
       maybeCacheActiveAssetWebglThumb();
+      if (!isFirstExtraction) {
+        showToast('检测到模型生成完成，已重新提取完整场景', 3000);
+      }
     } catch (err) {
       showToast(`转换出错: ${err.message}`, 4000);
     }
@@ -2127,13 +2264,76 @@ function loadHtmlScene(rawHtml, suggestedName = '', { keepAssetBinding = false }
       win.__ON_SOURCE_CAMERA_CHANGE__ = syncSourceToMc;
     }
     tryExtractFromIframe();
-    for (const delay of [350, 700, 1050, 1400, 1800, 2300, 3000, 4000, 5500, 8000]) {
-      setTimeout(tryExtractFromIframe, delay);
+    const delays = [350, 700, 1050, 1400, 1800, 2300, 3000, 4000, 5500, 8000, 12000, 16000];
+    for (const delay of delays) {
+      setTimeout(() => tryExtractFromIframe(delay === delays[delays.length - 1]), delay);
     }
   };
 
   sourceFrame.srcdoc = bridged;
 }
+
+function showModelDiagnosis() {
+  const win = sourceFrame.contentWindow;
+  state.sourceError = win?.__T2L_DIAGNOSTICS__?.errors?.slice(-3).join(' · ') || state.sourceError;
+  const report = diagnoseModelInput({
+    sourceKind: state.sourceKind,
+    voxelData: state.voxelData,
+    capturedScene: state.capturedScene,
+    importedGrid: state.importedGrid,
+    currentGrid: state.currentGrid,
+    sourceError: state.sourceError,
+    options: getConversionOptions(),
+  });
+  state.lastDiagnosis = report;
+  modelDiagnosticSummary.textContent = report.summary;
+  modelDiagnosticFindings.replaceChildren();
+  for (const finding of report.findings) {
+    const item = document.createElement('li');
+    item.className = finding.tone;
+    item.textContent = finding.text;
+    modelDiagnosticFindings.appendChild(item);
+  }
+  modelDiagnosticReport.classList.remove('hidden');
+  applyGenericRepairBtn.disabled = !report.repair;
+  undoGenericRepairBtn.classList.toggle('hidden', !state.inMemoryRepair);
+  modelRepairMemoryNote.textContent = state.inMemoryRepair
+    ? `已应用内存态修复：${state.inMemoryRepair.summary} 原始文件未修改；可随时撤销。`
+    : '修复需你确认；只缓存于本次工作台内存，不改写原始文件。';
+}
+
+diagnoseModelBtn.addEventListener('click', showModelDiagnosis);
+applyGenericRepairBtn.addEventListener('click', () => {
+  const repair = state.lastDiagnosis?.repair;
+  if (!repair) return;
+  const previousRepair = state.inMemoryRepair;
+  state.inMemoryRepair = repair;
+  try {
+    if (state.inMemoryRepair) {
+      state.inMemoryRepair.sourceSession = sourceExtractSession;
+    }
+    rebuildSchematic(true);
+    undoGenericRepairBtn.classList.remove('hidden');
+    applyGenericRepairBtn.disabled = true;
+    modelDiagnosticSummary.textContent = '通用修复已应用';
+    modelRepairMemoryNote.textContent = `当前预览使用内存态修复：${repair.summary} 原始文件未修改。`;
+    showToast('通用修复已在内存副本应用并重新渲染', 3400);
+  } catch (err) {
+    state.inMemoryRepair = previousRepair;
+    showToast(`通用修复失败，已保留原预览：${err.message}`, 4200);
+  }
+});
+
+undoGenericRepairBtn.addEventListener('click', () => {
+  state.inMemoryRepair = null;
+  try {
+    rebuildSchematic(true);
+    showModelDiagnosis();
+    showToast('已恢复原始转换结果；模型文件未变更');
+  } catch (err) {
+    showToast(`恢复原始转换失败：${err.message}`, 4000);
+  }
+});
 
 async function handleImportedFiles(fileList) {
   const files = Array.from(fileList || []);
@@ -2173,6 +2373,7 @@ async function handleImportedFiles(fileList) {
 
   // Single-file import into live workspace
   const file = files[0];
+  resetModelDiagnosisUI();
   const nameNoExt = file.name.replace(/\.[^.]+$/, '');
   const ext = file.name.split('.').pop().toLowerCase();
   state.currentAssetId = null;
@@ -2186,6 +2387,9 @@ async function handleImportedFiles(fileList) {
     state.sourceExt = ext;
     const decoded = ext === 'schem' ? await decodeSpongeSchem(u8) : await decodeLitematic(u8);
     state.sourceKind = 'litematic';
+    state.inMemoryRepair = null;
+    state.lastDiagnosis = null;
+    state.sourceError = null;
     state.importedGrid = decoded;
     state.previewDeferred = true;
     state.highlightedBlockId = null;
@@ -2207,6 +2411,9 @@ async function handleImportedFiles(fileList) {
   if (ext === 'json') {
     const parsed = JSON.parse(text);
     state.sourceKind = 'json';
+    state.inMemoryRepair = null;
+    state.lastDiagnosis = null;
+    state.sourceError = null;
     state.rawHtml = text;
     state.voxelData = parsed;
     state.capturedScene = null;
@@ -2377,6 +2584,11 @@ layerSlider.addEventListener('input', () => {
 });
 
 window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !dropOverlay.classList.contains('hidden')) {
+    e.preventDefault();
+    hideDropOverlay();
+    return;
+  }
   const tag = document.activeElement?.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
   if (e.key === 'ArrowUp') {
@@ -2619,10 +2831,14 @@ applyCodeBtn.addEventListener('click', () => {
   const raw = codeTextarea.value.trim();
   if (!raw) return;
   editorModal.classList.add('hidden');
+  resetModelDiagnosisUI();
   if (raw.startsWith('{') || raw.startsWith('[')) {
     try {
       const parsed = JSON.parse(raw);
       state.sourceKind = 'json';
+      state.inMemoryRepair = null;
+      state.lastDiagnosis = null;
+      state.sourceError = null;
       state.sourceExt = 'json';
       state.rawHtml = raw;
       state.rawBinaryBytes = null;
@@ -2645,18 +2861,69 @@ applyCodeBtn.addEventListener('click', () => {
   showToast('已运行代码并更新 MC 投影预览');
 });
 
-window.addEventListener('dragover', (e) => {
-  e.preventDefault();
+let dropDragActive = false;
+let dropDragDepth = 0;
+
+function isFileDrag(e) {
+  const types = e.dataTransfer?.types;
+  if (!types) return false;
+  return Array.from(types).some((type) => String(type).toLowerCase() === 'files');
+}
+
+function showDropOverlay() {
+  dropDragActive = true;
   dropOverlay.classList.remove('hidden');
+}
+
+function hideDropOverlay() {
+  dropDragActive = false;
+  dropDragDepth = 0;
+  dropOverlay.classList.add('hidden');
+}
+
+function isLeavingViewport(e) {
+  if (e.relatedTarget) return false;
+  return (
+    e.clientX <= 0 ||
+    e.clientY <= 0 ||
+    e.clientX >= window.innerWidth ||
+    e.clientY >= window.innerHeight
+  );
+}
+
+window.addEventListener('dragenter', (e) => {
+  if (!isFileDrag(e)) return;
+  e.preventDefault();
+  dropDragDepth += 1;
+  showDropOverlay();
 });
-dropOverlay.addEventListener('dragleave', (e) => {
-  if (e.target === dropOverlay) dropOverlay.classList.add('hidden');
+window.addEventListener('dragover', (e) => {
+  if (!isFileDrag(e)) return;
+  e.preventDefault();
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+  if (!dropDragActive) showDropOverlay();
+});
+window.addEventListener('dragleave', (e) => {
+  if (!dropDragActive) return;
+  if (isLeavingViewport(e)) {
+    hideDropOverlay();
+    return;
+  }
+  dropDragDepth = Math.max(0, dropDragDepth - 1);
+  if (dropDragDepth === 0) hideDropOverlay();
 });
 window.addEventListener('drop', (e) => {
+  if (!isFileDrag(e) && !dropDragActive) return;
   e.preventDefault();
-  dropOverlay.classList.add('hidden');
+  hideDropOverlay();
   if (e.dataTransfer?.files?.length) handleImportedFiles(e.dataTransfer.files);
 });
+window.addEventListener('dragend', hideDropOverlay);
+window.addEventListener('blur', hideDropOverlay);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) hideDropOverlay();
+});
+dropOverlay.addEventListener('click', hideDropOverlay);
 
 // ==================== Offline 2D Minecraft Save World Map Editor ====================
 const worldState = {

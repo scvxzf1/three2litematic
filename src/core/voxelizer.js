@@ -595,17 +595,19 @@ export function extractSceneVoxels(scene, options = {}) {
   let groundClipBounds = null;
 
   if (ignoreBackdrop && primitives.length >= 4) {
-    // Sort horizontal spans to find core cluster (excluding top 1~2 outlier planes)
+    // Use the median span instead of an upper percentile. With only a few
+    // primitives, an upper percentile can select the giant ground plane
+    // itself and then fail to recognize it as an outlier.
     const spans = primitives
       .map((p) => Math.max(p.bbox.maxX - p.bbox.minX, p.bbox.maxZ - p.bbox.minZ))
       .sort((a, b) => a - b);
-    const p85Span = spans[Math.floor(spans.length * 0.85)] || spans[spans.length - 1];
+    const coreSpan = spans[Math.floor(spans.length * 0.5)] || spans[spans.length - 1];
 
     const corePrims = primitives.filter((p) => {
       const spanXZ = Math.max(p.bbox.maxX - p.bbox.minX, p.bbox.maxZ - p.bbox.minZ);
       const spanY = p.bbox.maxY - p.bbox.minY;
-      const isGiantFlatPlane = spanXZ > Math.max(40, p85Span * 3.5) && spanY <= Math.max(1.5, spanXZ * 0.03);
-      const isGiantSphere = spanXZ > Math.max(80, p85Span * 6);
+      const isGiantFlatPlane = spanXZ > Math.max(40, coreSpan * 3.5) && spanY <= Math.max(1.5, spanXZ * 0.03);
+      const isGiantSphere = spanXZ > Math.max(80, coreSpan * 6);
       return !isGiantFlatPlane && !isGiantSphere;
     });
 
@@ -628,7 +630,7 @@ export function extractSceneVoxels(scene, options = {}) {
       activePrimitives = primitives.filter((p) => {
         const spanXZ = Math.max(p.bbox.maxX - p.bbox.minX, p.bbox.maxZ - p.bbox.minZ);
         const spanY = p.bbox.maxY - p.bbox.minY;
-        const isGiantSphere = spanXZ > Math.max(80, p85Span * 6) && spanY > spanXZ * 0.3;
+        const isGiantSphere = spanXZ > Math.max(80, coreSpan * 6) && spanY > spanXZ * 0.3;
         return !isGiantSphere;
       });
     }
@@ -847,6 +849,23 @@ export function extractSceneVoxels(scene, options = {}) {
           const fx = w * v0x + u * v1x + v * v2x;
           const fy = w * v0y + u * v1y + v * v2y;
           const fz = w * v0z + u * v1z + v * v2z;
+
+          // A giant ground triangle can cross the whole clip box while all
+          // three of its vertices remain outside. Clip per sample instead of
+          // only rejecting triangles that are entirely outside.
+          if (groundClipBounds) {
+            const wx = fx + sMinX;
+            const wz = fz + sMinZ;
+            if (
+              wx < groundClipBounds.minX ||
+              wx > groundClipBounds.maxX ||
+              wz < groundClipBounds.minZ ||
+              wz > groundClipBounds.maxZ
+            ) {
+              continue;
+            }
+          }
+
           const px = Math.floor(fx);
           const py = Math.floor(fy);
           const pz = Math.floor(fz);

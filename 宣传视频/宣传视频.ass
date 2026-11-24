@@ -1,0 +1,23 @@
+[Script Info]
+Title: three2litematic 项目宣传视频
+ScriptType: v4.00+
+WrapStyle: 2
+ScaledBorderAndShadow: yes
+YCbCr Matrix: TV.709
+PlayResX: 1920
+PlayResY: 1080
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Sub,Source Han Sans CN,43,&H00FFFFFF,&H0000FFFF,&H00101825,&H58081018,0,0,0,0,100,100,0,0,3,1.6,1,2,90,90,66,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:04.85,Sub,,0,0,0,,从 Three.js 场景，轻松预览 Minecraft 方块蓝图
+Dialogue: 0,0:00:04.85,0:00:09.70,Sub,,0,0,0,,资产库集中管理：搜索、收藏、分类与批量打包导出
+Dialogue: 0,0:00:09.70,0:00:14.55,Sub,,0,0,0,,导入 .litematic 或 .schem，查看尺寸与材料清单
+Dialogue: 0,0:00:14.55,0:00:19.40,Sub,,0,0,0,,按需生成 3D 预览，直观查看导入蓝图全貌
+Dialogue: 0,0:00:19.40,0:00:24.25,Sub,,0,0,0,,切换材质与颜色模式，检查方块映射效果
+Dialogue: 0,0:00:24.25,0:00:29.10,Sub,,0,0,0,,切换昼夜光照，细看模型的色彩与层次
+Dialogue: 0,0:00:29.10,0:00:33.95,Sub,,0,0,0,,拖动 Y 层切片，逐层核对内部结构
+Dialogue: 0,0:00:33.95,0:00:39.15,Sub,,0,0,0,,预览尺寸、方块数与材料类型，一键导出 Litematica

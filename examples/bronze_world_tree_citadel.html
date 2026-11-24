@@ -1,0 +1,3850 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0a110e" />
+  <title>铸枝之城 · 古代青铜巨树城邦</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #e8e3d4;
+      --muted: #a8a795;
+      --dim: #74796e;
+      --gold: #d8b778;
+      --bronze: #b57a48;
+      --patina: #79aa96;
+      --ember: #ffb468;
+      --line: rgba(222, 198, 151, 0.2);
+      --glass: rgba(10, 18, 15, 0.72);
+      --serif: "Iowan Old Style", "Palatino Linotype", "Songti SC", "Noto Serif CJK SC", Georgia, serif;
+      --sans: "Avenir Next", "Gill Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      color: var(--ink);
+      background:
+        radial-gradient(ellipse at 66% 10%, rgba(118, 158, 137, 0.34) 0%, transparent 43%),
+        radial-gradient(ellipse at 62% 42%, rgba(60, 94, 77, 0.18) 0%, transparent 48%),
+        radial-gradient(ellipse at 36% 83%, rgba(139, 92, 49, 0.16) 0%, transparent 42%),
+        linear-gradient(155deg, #12201b 0%, #0a130f 47%, #050907 100%);
+      font-family: var(--sans);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    #stage { position: fixed; inset: 0; }
+    #stage canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+    #stage canvas:active { cursor: grabbing; }
+
+    .vignette {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background:
+        linear-gradient(90deg, rgba(4, 8, 6, 0.7) 0%, rgba(4, 8, 6, 0.24) 27%, transparent 52%),
+        linear-gradient(0deg, rgba(4, 8, 6, 0.62) 0%, transparent 23%, transparent 78%, rgba(4, 8, 6, 0.28) 100%),
+        radial-gradient(ellipse at center, transparent 44%, rgba(1, 3, 2, 0.44) 100%);
+    }
+
+    .interface {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(8px);
+      animation: reveal 1.1s cubic-bezier(.2,.7,.2,1) forwards;
+    }
+    .reveal.delay-1 { animation-delay: .18s; }
+    .reveal.delay-2 { animation-delay: .32s; }
+    .reveal.delay-3 { animation-delay: .46s; }
+    @keyframes reveal {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .masthead {
+      position: absolute;
+      top: clamp(28px, 5vh, 64px);
+      left: clamp(24px, 4.2vw, 72px);
+      width: min(365px, 31vw);
+      text-shadow: 0 2px 28px rgba(0, 0, 0, 0.55);
+    }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      margin: 0 0 26px;
+      color: var(--gold);
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+    }
+
+    .signet {
+      display: grid;
+      width: 29px;
+      height: 29px;
+      place-items: center;
+      border: 1px solid rgba(220, 185, 119, 0.55);
+      border-radius: 50%;
+      color: #f1dfb6;
+      font-family: var(--serif);
+      font-size: 14px;
+    }
+
+    h1 {
+      margin: 0;
+      color: #f0e8d6;
+      font-family: var(--serif);
+      font-size: clamp(44px, 5.4vw, 78px);
+      font-weight: 400;
+      letter-spacing: -0.055em;
+      line-height: 0.95;
+    }
+    h1 span {
+      display: block;
+      margin-top: 13px;
+      color: #cba66e;
+      font-family: var(--sans);
+      font-size: clamp(10px, 0.9vw, 13px);
+      font-weight: 500;
+      letter-spacing: 0.32em;
+      line-height: 1.5;
+    }
+
+    .lede {
+      max-width: 325px;
+      margin: 28px 0 0;
+      color: rgba(230, 225, 208, 0.68);
+      font-family: var(--serif);
+      font-size: 13px;
+      line-height: 1.95;
+    }
+
+    .rule {
+      width: 172px;
+      height: 1px;
+      margin: 26px 0 17px;
+      background: linear-gradient(90deg, rgba(214, 179, 112, 0.72), transparent);
+    }
+
+    .coordinates {
+      margin: 0;
+      color: rgba(221, 211, 188, 0.45);
+      font-size: 8px;
+      letter-spacing: 0.2em;
+      line-height: 2;
+      text-transform: uppercase;
+    }
+
+    .legend {
+      position: absolute;
+      left: clamp(24px, 4.2vw, 72px);
+      bottom: clamp(70px, 9vh, 112px);
+      width: 230px;
+    }
+
+    .legend-label {
+      margin: 0 0 10px;
+      color: rgba(218, 199, 161, 0.46);
+      font-size: 8px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+    }
+
+    .legend-row {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 5px 0;
+      color: rgba(230, 225, 210, 0.62);
+      font-size: 9px;
+      letter-spacing: 0.08em;
+    }
+    .swatch {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--bronze);
+      box-shadow: 0 0 10px rgba(199, 140, 82, 0.36);
+    }
+    .swatch.stone { background: #d4cbb9; box-shadow: 0 0 9px rgba(220, 210, 188, 0.22); }
+    .swatch.light { background: var(--ember); box-shadow: 0 0 12px rgba(255, 176, 98, 0.6); }
+    .swatch.patina { background: var(--patina); box-shadow: 0 0 10px rgba(112, 174, 148, 0.42); }
+
+    .telemetry {
+      position: absolute;
+      top: clamp(30px, 5vh, 64px);
+      right: clamp(24px, 4vw, 64px);
+      width: min(272px, 24vw);
+      padding: 19px 20px 18px;
+      border: 1px solid var(--line);
+      background: linear-gradient(145deg, rgba(14, 23, 19, 0.8), rgba(8, 14, 12, 0.54));
+      backdrop-filter: blur(15px);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+    }
+
+    .telemetry-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 0 0 16px;
+      color: var(--gold);
+      font-size: 8px;
+      font-weight: 600;
+      letter-spacing: 0.21em;
+      text-transform: uppercase;
+    }
+    .telemetry-title::after {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #8db69e;
+      box-shadow: 0 0 12px #7da88f;
+      content: "";
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px 15px;
+    }
+    .metric {
+      padding-top: 11px;
+      border-top: 1px solid rgba(217, 195, 155, 0.1);
+    }
+    .metric b {
+      display: block;
+      margin-bottom: 4px;
+      color: #e9d9b9;
+      font-family: var(--serif);
+      font-size: 23px;
+      font-weight: 400;
+      letter-spacing: -0.03em;
+      line-height: 1;
+    }
+    .metric span {
+      color: rgba(222, 217, 201, 0.44);
+      font-size: 7px;
+      letter-spacing: 0.15em;
+      line-height: 1.5;
+      text-transform: uppercase;
+    }
+
+    .anchor-list {
+      display: grid;
+      gap: 6px;
+      margin-top: 17px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(217, 195, 155, 0.1);
+    }
+    .anchor-row {
+      display: grid;
+      grid-template-columns: 30px 1fr auto;
+      gap: 8px;
+      align-items: baseline;
+      color: rgba(230, 225, 210, 0.58);
+      font-size: 8px;
+      letter-spacing: 0.06em;
+    }
+    .anchor-row em {
+      color: rgba(203, 168, 108, 0.58);
+      font-style: normal;
+      font-size: 7px;
+      letter-spacing: 0.12em;
+    }
+    .anchor-row strong {
+      color: rgba(230, 225, 210, 0.78);
+      font-weight: 400;
+    }
+    .anchor-row span {
+      color: rgba(132, 167, 145, 0.7);
+      font-variant-numeric: tabular-nums;
+      font-size: 7px;
+    }
+
+    .toolbar {
+      position: absolute;
+      right: clamp(24px, 4vw, 64px);
+      bottom: clamp(26px, 4.5vh, 52px);
+      display: flex;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    button {
+      border: 1px solid rgba(218, 194, 150, 0.22);
+      border-radius: 1px;
+      padding: 10px 13px;
+      color: rgba(237, 226, 203, 0.8);
+      background: rgba(10, 17, 14, 0.58);
+      backdrop-filter: blur(12px);
+      font-family: var(--sans);
+      font-size: 8px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: 180ms ease;
+    }
+    button:hover, button.active {
+      border-color: rgba(221, 184, 117, 0.55);
+      color: #f0dfbc;
+      background: rgba(39, 40, 29, 0.66);
+    }
+    button:focus-visible {
+      outline: 1px solid var(--gold);
+      outline-offset: 3px;
+    }
+
+    .view-note {
+      position: absolute;
+      right: clamp(24px, 4vw, 64px);
+      bottom: calc(clamp(26px, 4.5vh, 52px) + 42px);
+      color: rgba(218, 211, 193, 0.32);
+      font-size: 7px;
+      letter-spacing: 0.16em;
+      text-align: right;
+      text-transform: uppercase;
+    }
+
+    .footer-stamp {
+      position: absolute;
+      left: 50%;
+      bottom: 26px;
+      color: rgba(221, 211, 186, 0.28);
+      font-size: 7px;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      transform: translateX(-50%);
+      white-space: nowrap;
+    }
+
+    #loading {
+      position: fixed;
+      inset: 0;
+      z-index: 9;
+      display: grid;
+      place-content: center;
+      justify-items: center;
+      gap: 22px;
+      background:
+        radial-gradient(circle at center, rgba(19, 34, 27, 0.92), rgba(4, 8, 6, 0.98) 70%);
+      transition: opacity 900ms ease, visibility 900ms ease;
+    }
+    #loading.hidden { opacity: 0; visibility: hidden; }
+
+    .loading-mark {
+      position: relative;
+      width: 74px;
+      height: 74px;
+      border: 1px solid rgba(215, 183, 121, 0.25);
+      border-radius: 50%;
+    }
+    .loading-mark::before, .loading-mark::after {
+      position: absolute;
+      inset: 8px;
+      border: 1px solid rgba(111, 163, 138, 0.5);
+      border-radius: 50%;
+      content: "";
+      animation: turn 3.6s linear infinite;
+    }
+    .loading-mark::after {
+      inset: 22px;
+      border-color: rgba(223, 184, 113, 0.75);
+      animation-direction: reverse;
+      animation-duration: 2.4s;
+    }
+    @keyframes turn { to { transform: rotate(360deg); } }
+
+    .loading-copy {
+      margin: 0;
+      color: rgba(228, 218, 194, 0.68);
+      font-family: var(--serif);
+      font-size: 12px;
+      letter-spacing: 0.2em;
+    }
+    .loading-sub {
+      margin: -12px 0 0;
+      color: rgba(211, 197, 169, 0.32);
+      font-size: 7px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+    }
+
+    .error {
+      max-width: 520px;
+      padding: 30px;
+      color: #f0c7b8;
+      font-family: var(--sans);
+      font-size: 13px;
+      line-height: 1.8;
+    }
+
+    @media (max-width: 920px) {
+      .masthead { width: min(330px, 50vw); }
+      .telemetry { width: 220px; }
+      .anchor-list { display: none; }
+      .legend { display: none; }
+    }
+
+    @media (max-width: 680px) {
+      .masthead { top: 22px; left: 20px; width: 68vw; }
+      .eyebrow { margin-bottom: 16px; font-size: 7px; }
+      h1 { font-size: clamp(38px, 12vw, 58px); }
+      h1 span { font-size: 8px; letter-spacing: 0.22em; }
+      .lede, .rule, .coordinates { display: none; }
+      .telemetry {
+        top: auto;
+        right: 20px;
+        bottom: 72px;
+        width: 166px;
+        padding: 12px;
+      }
+      .metric-grid { gap: 8px; }
+      .metric b { font-size: 16px; }
+      .metric span { font-size: 6px; }
+      .toolbar { right: 20px; bottom: 22px; }
+      .view-note, .footer-stamp { display: none; }
+      .telemetry-title { margin-bottom: 8px; font-size: 6px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
+      .reveal { opacity: 1; transform: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="loading" role="status" aria-live="polite">
+    <div class="loading-mark" aria-hidden="true"></div>
+    <p class="loading-copy">正在铸造青铜巨树</p>
+    <p class="loading-sub">assembling the verdigris crown</p>
+  </div>
+
+  <main id="stage" aria-label="古代青铜巨树城邦三维体素模型"></main>
+  <div class="vignette" aria-hidden="true"></div>
+
+  <div class="interface">
+    <header class="masthead reveal">
+      <p class="eyebrow"><span class="signet">枝</span> CAST NO. VII · THE SKY-ROOTED CITY</p>
+      <h1>铸枝之城<span>THE VERDIGRIS CROWN</span></h1>
+      <p class="lede">
+        一株以古铜铸成的天穹巨树，承载着石砌里坊、观星塔与熔炉工坊。
+        根脉与枝桠互为街巷，螺旋长阶绕树而上，直至星环与叶冠。
+      </p>
+      <div class="rule"></div>
+      <p class="coordinates">
+        180 × 215 × 180 integer voxel field<br />
+        ground Y=0 · crown apex Y=200 · 3 physical material meshes
+      </p>
+    </header>
+
+    <aside class="telemetry reveal delay-1" aria-label="体素模型统计">
+      <p class="telemetry-title">Live Voxel Audit</p>
+      <div class="metric-grid">
+        <div class="metric"><b id="metric-height">200</b><span>格冠顶高度</span></div>
+        <div class="metric"><b id="metric-blocks">—</b><span>实心体素</span></div>
+        <div class="metric"><b id="metric-surface">—</b><span>表面实例</span></div>
+        <div class="metric"><b>3</b><span>InstancedMesh</span></div>
+      </div>
+      <div class="anchor-list" id="anchor-list"></div>
+    </aside>
+
+    <div class="legend reveal delay-2" aria-label="材质图例">
+      <p class="legend-label">Matter of the crown</p>
+      <div class="legend-row"><i class="swatch"></i><span>铸造青铜 / 暗金高光</span></div>
+      <div class="legend-row"><i class="swatch patina"></i><span>氧化铜绿 / 雨蚀沟槽</span></div>
+      <div class="legend-row"><i class="swatch stone"></i><span>浅灰石城 / 木梁瓦顶</span></div>
+      <div class="legend-row"><i class="swatch light"></i><span>窗火 / 灯廊 / 熔炉</span></div>
+    </div>
+
+    <div class="view-note reveal delay-3">拖拽旋转 · 滚轮接近 · 右键平移</div>
+    <div class="toolbar reveal delay-3">
+      <button id="btn-orbit" type="button" aria-pressed="false">自动环游</button>
+      <button id="btn-reset" type="button">重置视角</button>
+    </div>
+    <div class="footer-stamp">SURFACE-CULLED · TYPED ARRAY · DETERMINISTIC SEED</div>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.187.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.187.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    /* =========================================================================
+       01 · WORLD CONSTANTS & MATERIAL REGISTRY
+       ========================================================================= */
+
+    const GRID_X = 180;
+    const GRID_Y = 215;
+    const GRID_Z = 180;
+    const HALF_X = GRID_X / 2;
+    const HALF_Z = GRID_Z / 2;
+    const LAYER = GRID_X * GRID_Z;
+    const VOLUME = LAYER * GRID_Y;
+    const TOP_LIMIT = 199;        // 顶面因此精确到世界 Y = 200
+    const PLAZA_SURFACE = 8;
+    const TAU = Math.PI * 2;
+    const DEG = Math.PI / 180;
+
+    // 0 = air. 1..6 = bronze family, 7..16 = stone/wood family, 17..20 = emissive.
+    const MAT = Object.freeze({
+      PATINA_DEEP: 1, BRONZE_DARK: 2, BRONZE: 3, BRONZE_LIGHT: 4, GOLD: 5, PATINA: 6,
+      STONE_LIGHT: 7, STONE: 8, STONE_DARK: 9, STONE_MOSS: 10, BASALT: 11,
+      WOOD: 12, WOOD_DARK: 13, ROOF_TEAL: 14, ROOF_RUST: 15, PLASTER: 16,
+      WINDOW: 17, LANTERN: 18, FORGE: 19, STAR: 20,
+    });
+
+    const MATERIALS = [
+      null,
+      { key: 'patinaDeep', family: 0, color: '#234a40', block: 'minecraft:oxidized_copper' },
+      { key: 'bronzeDark', family: 0, color: '#643a24', block: 'minecraft:exposed_copper' },
+      { key: 'bronze', family: 0, color: '#a86536', block: 'minecraft:copper_block' },
+      { key: 'bronzeLight', family: 0, color: '#d2a15d', block: 'minecraft:cut_copper' },
+      { key: 'gold', family: 0, color: '#e4c17d', block: 'minecraft:gold_block' },
+      { key: 'patina', family: 0, color: '#4d8b74', block: 'minecraft:weathered_copper' },
+      { key: 'stoneLight', family: 1, color: '#cbc4b5', block: 'minecraft:calcite' },
+      { key: 'stone', family: 1, color: '#a7a092', block: 'minecraft:polished_diorite' },
+      { key: 'stoneDark', family: 1, color: '#716d64', block: 'minecraft:stone_bricks' },
+      { key: 'stoneMoss', family: 1, color: '#737968', block: 'minecraft:mossy_stone_bricks' },
+      { key: 'basalt', family: 1, color: '#3c3d3e', block: 'minecraft:deepslate_tiles' },
+      { key: 'wood', family: 1, color: '#6b4b31', block: 'minecraft:spruce_planks' },
+      { key: 'woodDark', family: 1, color: '#382619', block: 'minecraft:spruce_wood' },
+      { key: 'roofTeal', family: 1, color: '#30564b', block: 'minecraft:dark_prismarine' },
+      { key: 'roofRust', family: 1, color: '#7b392d', block: 'minecraft:red_terracotta' },
+      { key: 'plaster', family: 1, color: '#cbbca5', block: 'minecraft:white_terracotta' },
+      { key: 'window', family: 2, color: '#ffe1a1', emissive: '#ff9d42', block: 'minecraft:ochre_froglight' },
+      { key: 'lantern', family: 2, color: '#ffc177', emissive: '#ff7c2e', block: 'minecraft:shroomlight' },
+      { key: 'forge', family: 2, color: '#ff6a2b', emissive: '#ff3607', block: 'minecraft:magma_block' },
+      { key: 'star', family: 2, color: '#caf0de', emissive: '#77d3b5', block: 'minecraft:sea_lantern' },
+    ];
+
+    const FAMILY = Object.freeze({ BRONZE: 0, STONE: 1, EMISSIVE: 2 });
+    const BRONZE_VARIANTS = [MAT.PATINA_DEEP, MAT.BRONZE_DARK, MAT.BRONZE, MAT.BRONZE_LIGHT, MAT.GOLD, MAT.PATINA];
+    const STONE_VARIANTS = [MAT.STONE_LIGHT, MAT.STONE, MAT.STONE, MAT.STONE_DARK, MAT.STONE_MOSS];
+
+    const grid = new Uint8Array(VOLUME);
+    let solidCount = 0;
+    let modelMaxY = 0;
+
+    /* =========================================================================
+       02 · DETERMINISTIC NOISE & INTEGER GRID ACCESS
+       ========================================================================= */
+
+    function hash3(x, y, z, seed = 0) {
+      let h = Math.imul(x | 0, 0x1f123bb5) ^
+              Math.imul(y | 0, 0x05491333) ^
+              Math.imul(z | 0, 0x2f3d4f11) ^
+              Math.imul(seed | 0, 0x45d9f3b);
+      h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
+      h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
+      h ^= h >>> 16;
+      return (h >>> 0) / 4294967296;
+    }
+
+    const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const smoothstep = (a, b, x) => {
+      const t = clamp((x - a) / (b - a), 0, 1);
+      return t * t * (3 - 2 * t);
+    };
+    const wrappedAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+    const polarX = (cx, cz, radius, angle) => cx + Math.cos(angle) * radius;
+    const polarZ = (cx, cz, radius, angle) => cz + Math.sin(angle) * radius;
+
+    function indexOf(x, y, z) {
+      return y * LAYER + (z + HALF_Z) * GRID_X + (x + HALF_X);
+    }
+
+    function insideGrid(x, y, z) {
+      return x >= -HALF_X && x < HALF_X && z >= -HALF_Z && z < HALF_Z && y >= 0 && y <= TOP_LIMIT;
+    }
+
+    function getV(x, y, z) {
+      x = Math.round(x); y = Math.round(y); z = Math.round(z);
+      if (!insideGrid(x, y, z)) return 0;
+      return grid[indexOf(x, y, z)];
+    }
+
+    function setV(x, y, z, mat, onlyAir = false) {
+      x = Math.round(x); y = Math.round(y); z = Math.round(z);
+      if (!insideGrid(x, y, z) || !mat) return false;
+      const i = indexOf(x, y, z);
+      if (onlyAir && grid[i] !== 0) return false;
+      if (grid[i] === 0) solidCount++;
+      grid[i] = mat;
+      if (y > modelMaxY) modelMaxY = y;
+      return true;
+    }
+
+    function paintV(x, y, z, mat) {
+      x = Math.round(x); y = Math.round(y); z = Math.round(z);
+      if (!insideGrid(x, y, z)) return false;
+      const i = indexOf(x, y, z);
+      if (!grid[i]) return false;
+      grid[i] = mat;
+      return true;
+    }
+
+    function clearV(x, y, z) {
+      x = Math.round(x); y = Math.round(y); z = Math.round(z);
+      if (!insideGrid(x, y, z)) return false;
+      const i = indexOf(x, y, z);
+      if (!grid[i]) return false;
+      grid[i] = 0;
+      solidCount--;
+      return true;
+    }
+
+    /* =========================================================================
+       03 · MATERIAL PAINTERS
+       ========================================================================= */
+
+    function bronzeTone(x, y, z, seed = 0) {
+      // Two-cell patches keep the patina legible as cast metal rather than noise.
+      const n = hash3(Math.floor(x / 2), Math.floor(y / 2), Math.floor(z / 2), seed + 31);
+      if (n < 0.1) return MAT.PATINA;
+      if (n < 0.18) return MAT.PATINA_DEEP;
+      if (n < 0.37) return MAT.BRONZE_DARK;
+      if (n < 0.74) return MAT.BRONZE;
+      if (n < 0.92) return MAT.BRONZE_LIGHT;
+      return MAT.GOLD;
+    }
+
+    function stoneTone(x, y, z, seed = 0) {
+      const n = hash3(Math.floor(x / 2), Math.floor(y / 3), Math.floor(z / 2), seed + 57);
+      if (n < 0.16) return MAT.STONE_LIGHT;
+      if (n < 0.68) return MAT.STONE;
+      if (n < 0.88) return MAT.STONE_DARK;
+      if (n < 0.96) return MAT.STONE_MOSS;
+      return MAT.STONE;
+    }
+
+    function roofTone(base, x, y, z) {
+      const n = hash3(x, y, z, 73);
+      if (n < 0.08) return MAT.PATINA_DEEP;
+      if (n > 0.92) return MAT.BRONZE_DARK;
+      return base;
+    }
+
+    /* =========================================================================
+       04 · VOXEL BRUSHES
+       ========================================================================= */
+
+    function fillBox(x0, y0, z0, x1, y1, z1, material) {
+      const ax = Math.min(x0, x1), bx = Math.max(x0, x1);
+      const ay = Math.min(y0, y1), by = Math.max(y0, y1);
+      const az = Math.min(z0, z1), bz = Math.max(z0, z1);
+      const fn = typeof material === 'function';
+      for (let y = ay; y <= by; y++) {
+        for (let z = az; z <= bz; z++) {
+          for (let x = ax; x <= bx; x++) {
+            setV(x, y, z, fn ? material(x, y, z) : material);
+          }
+        }
+      }
+    }
+
+    function shellBox(x0, y0, z0, x1, y1, z1, material) {
+      const ax = Math.min(x0, x1), bx = Math.max(x0, x1);
+      const ay = Math.min(y0, y1), by = Math.max(y0, y1);
+      const az = Math.min(z0, z1), bz = Math.max(z0, z1);
+      const fn = typeof material === 'function';
+      for (let y = ay; y <= by; y++) {
+        for (let z = az; z <= bz; z++) {
+          for (let x = ax; x <= bx; x++) {
+            if (x === ax || x === bx || y === ay || y === by || z === az || z === bz) {
+              setV(x, y, z, fn ? material(x, y, z) : material);
+            }
+          }
+        }
+      }
+    }
+
+    function disc(cx, cz, y, radius, material, innerRadius = 0) {
+      const fn = typeof material === 'function';
+      const r2 = radius * radius;
+      const ir2 = innerRadius * innerRadius;
+      const reach = Math.ceil(radius);
+      const icx = Math.round(cx);
+      const icz = Math.round(cz);
+      for (let dz = -reach; dz <= reach; dz++) {
+        for (let dx = -reach; dx <= reach; dx++) {
+          const d2 = dx * dx + dz * dz;
+          if (d2 > r2 || d2 < ir2) continue;
+          const x = icx + dx;
+          const z = icz + dz;
+          setV(x, y, z, fn ? material(x, z, Math.sqrt(d2)) : material);
+        }
+      }
+    }
+
+    function ring(cx, cz, y, outer, inner, material) {
+      disc(cx, cz, y, outer, material, inner);
+    }
+
+    function chamferDeck(cx, cz, y, width, depth, material, cut = 2) {
+      const hw = Math.floor(width / 2);
+      const hd = Math.floor(depth / 2);
+      const fn = typeof material === 'function';
+      for (let dz = -hd; dz <= hd; dz++) {
+        for (let dx = -hw; dx <= hw; dx++) {
+          const cxCut = Math.max(0, Math.abs(dx) - (hw - cut));
+          const czCut = Math.max(0, Math.abs(dz) - (hd - cut));
+          if (cxCut + czCut > cut) continue;
+          const x = cx + dx;
+          const z = cz + dz;
+          setV(x, y, z, fn ? material(x, y, z) : material);
+        }
+      }
+    }
+
+    function stampSphere(cx, cy, cz, radius, material) {
+      const fn = typeof material === 'function';
+      const r2 = radius * radius;
+      const reach = Math.ceil(radius);
+      const icx = Math.round(cx), icy = Math.round(cy), icz = Math.round(cz);
+      for (let dy = -reach; dy <= reach; dy++) {
+        for (let dz = -reach; dz <= reach; dz++) {
+          for (let dx = -reach; dx <= reach; dx++) {
+            if (dx * dx + dy * dy + dz * dz > r2) continue;
+            const x = icx + dx, y = icy + dy, z = icz + dz;
+            setV(x, y, z, fn ? material(x, y, z) : material);
+          }
+        }
+      }
+    }
+
+    function strokeLine(x0, y0, z0, x1, y1, z1, radius, material) {
+      const length = Math.hypot(x1 - x0, y1 - y0, z1 - z0);
+      const steps = Math.max(1, Math.ceil(length * 1.65));
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        stampSphere(
+          lerp(x0, x1, t),
+          lerp(y0, y1, t),
+          lerp(z0, z1, t),
+          radius,
+          (x, y, z) => typeof material === 'function' ? material(x, y, z, t) : material
+        );
+      }
+    }
+
+    function tubeCurve(curve, radiusAt, materialAt, sampleStep = 0.58) {
+      const length = curve.getLength();
+      const steps = Math.max(3, Math.ceil(length / sampleStep));
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const p = curve.getPointAt(t);
+        const radius = radiusAt(t);
+        stampSphere(p.x, p.y, p.z, radius, (x, y, z) => materialAt(x, y, z, t));
+      }
+    }
+
+    function findSupportBelow(x, z, startY, minY = 0) {
+      const ix = Math.round(x);
+      const iz = Math.round(z);
+      for (let y = Math.floor(startY); y >= minY; y--) {
+        if (getV(ix, y, iz)) return y;
+      }
+      return null;
+    }
+
+    /* =========================================================================
+       05 · SMALL ARCHITECTURAL PROPS
+       ========================================================================= */
+
+    function addStandingLantern(x, y, z, tall = false) {
+      const top = tall ? y + 6 : y + 4;
+      for (let sy = y + 1; sy <= top - 1; sy++) {
+        setV(x, sy, z, MAT.BRONZE_DARK);
+      }
+      setV(x, top, z, MAT.LANTERN);
+      setV(x, top + 1, z, MAT.GOLD);
+      setV(x - 1, top, z, MAT.BRONZE_DARK);
+      setV(x + 1, top, z, MAT.BRONZE_DARK);
+      setV(x, top, z - 1, MAT.BRONZE_DARK);
+      setV(x, top, z + 1, MAT.BRONZE_DARK);
+      setV(x, y + 1, z - 1, MAT.BRONZE_DARK);
+      setV(x, y + 1, z + 1, MAT.BRONZE_DARK);
+    }
+
+    function addHangingLantern(x, y, z) {
+      setV(x, y, z, MAT.BRONZE_DARK);
+      setV(x, y - 1, z, MAT.LANTERN);
+      setV(x, y - 2, z, MAT.BRONZE_DARK);
+      setV(x - 1, y - 1, z, MAT.BRONZE_DARK);
+      setV(x + 1, y - 1, z, MAT.BRONZE_DARK);
+      setV(x, y - 1, z - 1, MAT.BRONZE_DARK);
+      setV(x, y - 1, z + 1, MAT.BRONZE_DARK);
+    }
+
+    function addBench(x, y, z, alongX = true) {
+      if (alongX) {
+        fillBox(x - 2, y, z, x + 2, y, z, MAT.WOOD_DARK);
+        setV(x - 2, y + 1, z - 1, MAT.BRONZE);
+        setV(x + 2, y + 1, z - 1, MAT.BRONZE);
+      } else {
+        fillBox(x, y, z - 2, x, y, z + 2, MAT.WOOD_DARK);
+        setV(x - 1, y + 1, z - 2, MAT.BRONZE);
+        setV(x - 1, y + 1, z + 2, MAT.BRONZE);
+      }
+    }
+
+    /* =========================================================================
+       06 · FOUNDATION, PLAZA, ROOT ARCHES
+       ========================================================================= */
+
+    function buildFoundation() {
+      const radii = [52, 52, 51, 50, 49, 48, 47, 46];
+
+      for (let y = 0; y <= 7; y++) {
+        const radius = radii[y];
+        disc(0, 0, y, radius, (x, z, distance) => {
+          const angle = Math.atan2(z, x);
+          const rim = distance > radius - 2.1;
+          const belt = y === 1 || y === 3 || y === 5;
+          if (rim) {
+            if (belt && hash3(x, y, z, 14) > 0.28) return MAT.BRONZE_DARK;
+            return hash3(x, y, z, 2) > 0.88 ? MAT.PATINA : MAT.BASALT;
+          }
+          if (y <= 2) return stoneTone(x, y, z, 5);
+          if (y === 7) {
+            const innerRing = Math.abs(distance - 25) < 0.8 || Math.abs(distance - 37.5) < 0.8;
+            const radial = Math.abs(wrappedAngle(angle - 0.0)) < 0.018;
+            if (innerRing || radial) return hash3(x, y, z, 9) > 0.35 ? MAT.BRONZE : MAT.PATINA_DEEP;
+            if (distance > 41.5) return hash3(x, y, z, 12) > 0.55 ? MAT.STONE : MAT.PATINA;
+            if (hash3(x, y, z, 13) > 0.92) return MAT.STONE_MOSS;
+            if (hash3(x, y, z, 15) > 0.74) return MAT.STONE_DARK;
+            return MAT.STONE;
+          }
+          return stoneTone(x, y, z, 7);
+        });
+      }
+
+      // 24 radial bronze floor channels.
+      for (let i = 0; i < 24; i++) {
+        const angle = (i / 24) * TAU;
+        for (let r = 16; r <= 45; r += 0.65) {
+          const x = Math.round(Math.cos(angle) * r);
+          const z = Math.round(Math.sin(angle) * r);
+          paintV(x, 7, z, i % 4 === 0 ? MAT.BRONZE : MAT.PATINA_DEEP);
+        }
+      }
+
+      // Processional paving between the southern roots.
+      for (let z = 18; z <= 45; z++) {
+        for (let x = -7; x <= 7; x++) {
+          if (Math.hypot(x, z) > 46) continue;
+          setV(x, 7, z, Math.abs(x) === 7 ? MAT.BRONZE_DARK : stoneTone(x, 7, z, 18));
+          if (Math.abs(x) === 7 && z % 6 === 0) paintV(x, 7, z, MAT.GOLD);
+        }
+      }
+
+      // Twelve deep bronze buttresses around the outer rim.
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * TAU + 8 * DEG;
+        const x = Math.round(Math.cos(a) * 49.5);
+        const z = Math.round(Math.sin(a) * 49.5);
+        fillBox(x - 1, 2, z - 1, x + 1, 6, z + 1, (bx, by, bz) =>
+          hash3(bx, by, bz, 21) > 0.72 ? MAT.PATINA : MAT.BRONZE_DARK
+        );
+        fillBox(x - 2, 6, z - 2, x + 2, 7, z + 2, MAT.BRONZE);
+      }
+
+      // Plaza edge crenellations, with a generous southern gate lane.
+      for (let i = 0; i < 72; i++) {
+        const a = (i / 72) * TAU;
+        if (a > 78 * DEG && a < 102 * DEG) continue;
+        if (i % 4 === 0) {
+          const x = Math.round(Math.cos(a) * 45.2);
+          const z = Math.round(Math.sin(a) * 45.2);
+          setV(x, 8, z, MAT.STONE_DARK);
+          setV(x, 9, z, i % 8 === 0 ? MAT.BRONZE_LIGHT : MAT.STONE);
+        }
+      }
+
+      // Lantern pylons marking the outer ceremonial ring.
+      for (const angle of [22, 62, 112, 158, 202, 248, 292, 338]) {
+        const x = Math.round(Math.cos(angle * DEG) * 41.5);
+        const z = Math.round(Math.sin(angle * DEG) * 41.5);
+        addStandingLantern(x, 7, z, true);
+      }
+
+      // Southern stair flight from the lower terrace up into the root plaza.
+      for (let step = 0; step < 6; step++) {
+        const y = 3 + step;
+        const z0 = 43 + step * 2;
+        fillBox(-6, y, z0, 6, y, z0 + 1, step % 2 === 0 ? MAT.STONE_LIGHT : MAT.STONE);
+        setV(-7, y + 1, z0, MAT.BRONZE_DARK);
+        setV(7, y + 1, z0, MAT.BRONZE_DARK);
+      }
+    }
+
+    function buildRoots() {
+      const rootAngles = [16, 64, 122, 176, 226, 276, 326];
+
+      rootAngles.forEach((degrees, index) => {
+        const a = degrees * DEG;
+        const startY = 33 + (index % 3) * 2;
+        const start = trunkCenterAt(startY);
+        const p0 = new THREE.Vector3(start.x, startY, start.z);
+        const p1 = new THREE.Vector3(
+          Math.cos(a) * 15 + (hash3(index, 1, 1, 51) - 0.5) * 3,
+          26,
+          Math.sin(a) * 15 + (hash3(index, 2, 1, 51) - 0.5) * 3
+        );
+        const p2 = new THREE.Vector3(
+          Math.cos(a) * 29,
+          17 - (index % 2) * 2,
+          Math.sin(a) * 29
+        );
+        const p3 = new THREE.Vector3(
+          Math.cos(a + 0.02) * 41,
+          9,
+          Math.sin(a + 0.02) * 41
+        );
+        const p4 = new THREE.Vector3(
+          Math.cos(a - 0.015) * 48,
+          7,
+          Math.sin(a - 0.015) * 48
+        );
+        const curve = new THREE.CatmullRomCurve3([p0, p1, p2, p3, p4], false, 'catmullrom', 0.34);
+
+        tubeCurve(
+          curve,
+          (t) => lerp(6.0, 2.05, t) + 0.46 * Math.sin(t * Math.PI * 4.3 + index),
+          (x, y, z, t) => {
+            const band = Math.sin(t * 58 + index * 1.7) > 0.92;
+            if (band) return hash3(x, y, z, 63) > 0.46 ? MAT.GOLD : MAT.BRONZE_LIGHT;
+            if (t > 0.72 && hash3(x, y, z, 64) > 0.7) return MAT.PATINA;
+            return bronzeTone(x, y, z, 61);
+          },
+          0.6
+        );
+
+        // Two far-reaching root fingers keep the silhouette gnarled and grounded.
+        for (const side of [-1, 1]) {
+          const branchAngle = a + side * 0.18;
+          const base = curve.getPointAt(0.62);
+          const finger = new THREE.CatmullRomCurve3([
+            base,
+            new THREE.Vector3(Math.cos(branchAngle) * 34, 12, Math.sin(branchAngle) * 34),
+            new THREE.Vector3(Math.cos(branchAngle + side * 0.04) * 44, 7, Math.sin(branchAngle + side * 0.04) * 44),
+          ]);
+          tubeCurve(
+            finger,
+            (t) => lerp(2.55, 1.1, t),
+            (x, y, z) => hash3(x, y, z, 66) > 0.76 ? MAT.PATINA : bronzeTone(x, y, z, 67),
+            0.62
+          );
+        }
+      });
+    }
+
+    /* =========================================================================
+       07 · TRUNK · CATMULL-ROM SPINE + CARVED BRONZE SKIN
+       ========================================================================= */
+
+    const TRUNK_CURVE = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0.0, 8, 0.0),
+      new THREE.Vector3(1.8, 25, -1.4),
+      new THREE.Vector3(-2.1, 46, 2.0),
+      new THREE.Vector3(2.6, 70, -2.1),
+      new THREE.Vector3(-1.9, 94, 2.3),
+      new THREE.Vector3(2.2, 114, -1.2),
+      new THREE.Vector3(0.0, 130, 0.0),
+    ], false, 'catmullrom', 0.32);
+
+    const TRUNK_LOOKUP = [];
+    for (let i = 0; i <= 640; i++) {
+      const p = TRUNK_CURVE.getPoint(i / 640);
+      TRUNK_LOOKUP.push({ y: p.y, x: p.x, z: p.z });
+    }
+
+    function trunkCenterAt(y) {
+      if (y <= TRUNK_LOOKUP[0].y) return { x: TRUNK_LOOKUP[0].x, z: TRUNK_LOOKUP[0].z };
+      const last = TRUNK_LOOKUP[TRUNK_LOOKUP.length - 1];
+      if (y >= last.y) return { x: last.x, z: last.z };
+      let low = 0;
+      let high = TRUNK_LOOKUP.length - 1;
+      while (high - low > 1) {
+        const mid = (low + high) >> 1;
+        if (TRUNK_LOOKUP[mid].y < y) low = mid;
+        else high = mid;
+      }
+      const a = TRUNK_LOOKUP[low];
+      const b = TRUNK_LOOKUP[high];
+      const t = (y - a.y) / Math.max(0.0001, b.y - a.y);
+      return { x: lerp(a.x, b.x, t), z: lerp(a.z, b.z, t) };
+    }
+
+    function trunkRadius(y) {
+      const t = clamp((y - 8) / 122, 0, 1);
+      let radius = 16.1 - 6.25 * smoothstep(0, 1, t);
+      radius += 1.15 * Math.exp(-Math.max(0, y - 8) / 9.5);
+      radius += 0.56 * Math.sin(t * Math.PI * 5.2 + 0.7);
+      radius += 0.3 * Math.sin(t * Math.PI * 11.4 + 2.2);
+      return Math.max(9.25, radius);
+    }
+
+    function buildTrunk() {
+      for (let y = 8; y <= 130; y++) {
+        const center = trunkCenterAt(y);
+        const radius = trunkRadius(y);
+        const reach = Math.ceil(radius);
+        const icx = Math.round(center.x);
+        const icz = Math.round(center.z);
+
+        for (let dz = -reach; dz <= reach; dz++) {
+          for (let dx = -reach; dx <= reach; dx++) {
+            const d = Math.hypot(dx, dz);
+            if (d > radius) continue;
+            const x = icx + dx;
+            const z = icz + dz;
+            const angle = Math.atan2(dz, dx);
+            const outer = d > radius - 1.28;
+
+            // Shallow carved channels: skip only the outermost skin cell.
+            const groove = outer &&
+              (Math.abs(Math.sin(angle * 7 + y * 0.041 + 0.65)) > 0.972 ||
+               Math.abs(Math.sin(angle * 17 - y * 0.017 + 1.9)) > 0.986);
+            if (groove && getV(x, y, z - 0) === 0) {
+              // The cell is skipped so the already-filled inner layer becomes a visible recess.
+              continue;
+            }
+
+            let material;
+            const band = y % 17 === 0 || y % 17 === 1 || y === 21 || y === 119;
+            const rib = Math.abs(Math.sin(angle * 8 - y * 0.035 + 0.3));
+            if (band && outer) {
+              material = (y % 34 < 17) ? MAT.BRONZE_DARK : MAT.PATINA;
+            } else if (outer && rib > 0.93) {
+              material = hash3(x, y, z, 81) > 0.52 ? MAT.GOLD : MAT.BRONZE_LIGHT;
+            } else if (outer && hash3(x, y, z, 82) > 0.84) {
+              material = MAT.PATINA;
+            } else {
+              material = bronzeTone(x, y, z, 83);
+            }
+            setV(x, y, z, material);
+          }
+        }
+      }
+
+      // Protruding longitudinal ribs.
+      for (let rib = 0; rib < 9; rib++) {
+        const angle = (rib / 9) * TAU + 0.19 + rib * 0.022;
+        for (let y = 12; y <= 126; y++) {
+          if (y % 17 === 0) continue;
+          const center = trunkCenterAt(y);
+          const radius = trunkRadius(y) + 1.05;
+          const x = Math.round(center.x + Math.cos(angle) * radius);
+          const z = Math.round(center.z + Math.sin(angle) * radius);
+          setV(x, y, z, rib % 3 === 0 ? MAT.BRONZE_LIGHT : bronzeTone(x, y, z, 91));
+        }
+      }
+
+      // Cast ring bands.
+      for (const bandY of [22, 39, 55, 71, 87, 103, 119]) {
+        const center = trunkCenterAt(bandY);
+        const radius = trunkRadius(bandY) + 1.2;
+        const samples = Math.ceil(TAU * radius * 1.35);
+        for (let i = 0; i < samples; i++) {
+          const a = (i / samples) * TAU;
+          for (let dy = 0; dy <= 1; dy++) {
+            const x = Math.round(center.x + Math.cos(a) * radius);
+            const z = Math.round(center.z + Math.sin(a) * radius);
+            setV(x, bandY + dy, z, (bandY + dy) % 4 === 0 ? MAT.PATINA : MAT.BRONZE_DARK);
+          }
+        }
+      }
+
+      carveGroundEntrance();
+    }
+
+    function carveGroundEntrance() {
+      const center = trunkCenterAt(12);
+      const frontZ = Math.round(center.z + trunkRadius(12) + 0.5);
+
+      for (let y = 8; y <= 21; y++) {
+        const halfWidth = y < 15 ? 4 : Math.round(4 * Math.sqrt(Math.max(0, 1 - ((y - 15) / 7) ** 2)));
+        for (let x = -halfWidth; x <= halfWidth; x++) {
+          for (let z = frontZ - 4; z <= frontZ + 1; z++) {
+            clearV(x, y, z);
+          }
+        }
+      }
+
+      // Warm inner silhouette visible through the open gate.
+      for (let y = 9; y <= 16; y++) {
+        setV(-3, y, frontZ - 4, MAT.BRONZE_DARK);
+        setV(3, y, frontZ - 4, MAT.BRONZE_DARK);
+      }
+      setV(-2, 13, frontZ - 4, MAT.WINDOW);
+      setV(0, 14, frontZ - 4, MAT.LANTERN);
+      setV(2, 13, frontZ - 4, MAT.WINDOW);
+
+      // Stone gatehouse wedged between the southern roots.
+      for (const side of [-1, 1]) {
+        const x = side * 7;
+        fillBox(x - 1, 8, frontZ - 1, x + 1, 24, frontZ + 2, (bx, by, bz) =>
+          hash3(bx, by, bz, 101) > 0.78 ? MAT.STONE_MOSS : stoneTone(bx, by, bz, 102)
+        );
+        fillBox(x - 2, 24, frontZ, x + 2, 25, frontZ + 1, MAT.BRONZE);
+        addStandingLantern(x, 17, frontZ + 3, true);
+      }
+      fillBox(-7, 22, frontZ, 7, 24, frontZ + 1, (x, y, z) =>
+        hash3(x, y, z, 103) > 0.68 ? MAT.PATINA : MAT.BRONZE_DARK
+      );
+      fillBox(-8, 25, frontZ, 8, 26, frontZ + 1, MAT.BRONZE_LIGHT);
+      setV(0, 25, frontZ + 1, MAT.GOLD);
+
+      // Threshold and paired low benches.
+      fillBox(-6, 8, frontZ + 2, 6, 8, frontZ + 4, MAT.STONE_LIGHT);
+      addBench(-11, 8, frontZ + 5, true);
+      addBench(11, 8, frontZ + 5, true);
+    }
+
+    /* =========================================================================
+       08 · 3.35-TURN GRAND SPIRAL STAIR
+       ========================================================================= */
+
+    const STAIR_START = 8;
+    const STAIR_END = 130;
+    // A literal 45-wide / 33.5-turn stair would fuse into a sealed cylinder at
+    // this trunk radius. These constants preserve the brief's implied 4–5 cell
+    // tread and 3–3.5 turn spiral while remaining fully walkable and open.
+    const STAIR_TURNS = 3.35;
+    const STAIR_WIDTH = 5;
+    let stairAngleAtTop = 0;
+
+    function buildSpiralStair() {
+      const stepAngle = (TAU * STAIR_TURNS) / (STAIR_END - STAIR_START);
+      const startAngle = -Math.PI * 0.43;
+      const halfSpan = Math.max(0.105, stepAngle * 0.64);
+
+      for (let y = STAIR_START; y <= STAIR_END; y++) {
+        const t = (y - STAIR_START) / (STAIR_END - STAIR_START);
+        const angle = startAngle + t * TAU * STAIR_TURNS;
+        stairAngleAtTop = angle;
+        const center = trunkCenterAt(y);
+        const inner = trunkRadius(y) + 1.05;
+        const outer = inner + STAIR_WIDTH;
+        const reach = Math.ceil(outer + 1);
+
+        for (let dz = -reach; dz <= reach; dz++) {
+          for (let dx = -reach; dx <= reach; dx++) {
+            const d = Math.hypot(dx, dz);
+            if (d < inner || d > outer) continue;
+            const cellAngle = Math.atan2(dz, dx);
+            if (Math.abs(wrappedAngle(cellAngle - angle)) > halfSpan) continue;
+
+            const x = Math.round(center.x) + dx;
+            const z = Math.round(center.z) + dz;
+            const radial = (d - inner) / STAIR_WIDTH;
+            const edge = radial > 0.8;
+            const material = edge
+              ? (y % 6 === 0 ? MAT.GOLD : MAT.BRONZE_LIGHT)
+              : (y % 4 === 0 ? MAT.PATINA_DEEP : (y % 2 === 0 ? MAT.BRONZE_LIGHT : MAT.BRONZE));
+            setV(x, y, z, material);
+            setV(x, y - 1, z, hash3(x, y, z, 122) > 0.72 ? MAT.PATINA_DEEP : MAT.BRONZE_DARK);
+
+            // A continuous low outer lip plus periodic crenellations.
+            if (radial > 0.91) {
+              setV(x, y + 1, z, y % 6 === 0 ? MAT.GOLD : MAT.BRONZE_LIGHT);
+              if (y % 12 === 0) setV(x, y + 2, z, MAT.BRONZE_LIGHT);
+            }
+          }
+        }
+
+        // Structural diagonal brackets reach back into the trunk.
+        if (y % 6 === 0) {
+          const centerLow = trunkCenterAt(Math.max(STAIR_START, y - 5));
+          const r0 = trunkRadius(y - 5) - 0.4;
+          const ax = centerLow.x + Math.cos(angle) * r0;
+          const az = centerLow.z + Math.sin(angle) * r0;
+          const bx = center.x + Math.cos(angle) * (outer - 0.4);
+          const bz = center.z + Math.sin(angle) * (outer - 0.4);
+          strokeLine(ax, y - 5, az, bx, y - 1, bz, 1.15, (x, yy, z) =>
+            hash3(x, yy, z, 123) > 0.7 ? MAT.PATINA : MAT.BRONZE_DARK
+          );
+        }
+
+        // A lantern every twenty cells of ascent.
+        if (y % 14 === 0) {
+          const lx = Math.round(center.x + Math.cos(angle + halfSpan * 0.7) * (outer + 0.4));
+          const lz = Math.round(center.z + Math.sin(angle + halfSpan * 0.7) * (outer + 0.4));
+          setV(lx, y + 1, lz, MAT.BRONZE_DARK);
+          setV(lx, y + 2, lz, MAT.BRONZE_DARK);
+          setV(lx, y + 3, lz, MAT.LANTERN);
+          setV(lx, y + 4, lz, MAT.GOLD);
+        }
+      }
+
+      buildRestRings();
+    }
+
+    function buildRestRings() {
+      for (const y of [38, 68, 98]) {
+        const center = trunkCenterAt(y);
+        const inner = trunkRadius(y) + 1.4;
+        const outer = inner + 9.8;
+
+        for (let layer = 0; layer < 2; layer++) {
+          ring(center.x, center.z, y - layer, outer - layer * 0.55, inner, (x, z, d) => {
+            if (layer === 0 && Math.abs(d - (outer - 1.35)) < 0.8) {
+              return hash3(x, y, z, 131) > 0.55 ? MAT.PATINA : MAT.BRONZE_DARK;
+            }
+            if (layer === 0 && d > outer - 3.2) return MAT.STONE;
+            return stoneTone(x, y - layer, z, 132);
+          });
+        }
+
+        // Bronze radial inlays keep the rest terraces legible instead of blank discs.
+        for (let i = 0; i < 12; i++) {
+          const a = (i / 12) * TAU + 0.16;
+          for (let r = inner + 1.2; r <= outer - 1.7; r += 0.75) {
+            const x = Math.round(center.x + Math.cos(a) * r);
+            const z = Math.round(center.z + Math.sin(a) * r);
+            setV(x, y, z, i % 4 === 0 ? MAT.GOLD : MAT.PATINA_DEEP);
+          }
+        }
+
+        for (let i = 0; i < 40; i++) {
+          const a = (i / 40) * TAU;
+          const lx = Math.round(center.x + Math.cos(a) * (outer - 0.6));
+          const lz = Math.round(center.z + Math.sin(a) * (outer - 0.6));
+          setV(lx, y + 1, lz, i % 5 === 0 ? MAT.BRONZE_LIGHT : MAT.BRONZE_DARK);
+          if (i % 10 === 0) {
+            setV(lx, y + 2, lz, MAT.BRONZE_DARK);
+            setV(lx, y + 3, lz, MAT.LANTERN);
+            setV(lx, y + 4, lz, MAT.GOLD);
+          }
+        }
+
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * TAU + 0.2;
+          const sx = center.x + Math.cos(a) * (trunkRadius(y) - 0.5);
+          const sz = center.z + Math.sin(a) * (trunkRadius(y) - 0.5);
+          const ex = center.x + Math.cos(a) * (outer - 1);
+          const ez = center.z + Math.sin(a) * (outer - 1);
+          strokeLine(sx, y - 6, sz, ex, y - 1, ez, 1.08, MAT.BRONZE_DARK);
+        }
+      }
+    }
+
+    /* =========================================================================
+       09 · PLATFORM REGISTRY · EXPLICIT WORLD-SPACE ANCHORS
+       ========================================================================= */
+
+    const PLATFORM_ANCHORS = [
+      {
+        id: 'hub', label: '树心枢纽广场', code: 'HUB', kind: 'hub',
+        x: 0, z: 0, y: 130, w: 72, d: 72, branchBase: null,
+      },
+      {
+        id: 'observatory', label: '星环观星塔', code: 'OBS', kind: 'function',
+        x: 68, z: 22, y: 140, w: 25, d: 25, branchBase: 108, roof: 'teal',
+      },
+      {
+        id: 'res-sun', label: '日冕里坊', code: 'SUN', kind: 'residence',
+        x: 33, z: 62, y: 137, w: 33, d: 29, branchBase: 98, roof: 'mix',
+      },
+      {
+        id: 'res-high', label: '高枝里坊', code: 'HIGH', kind: 'residence',
+        x: -20, z: 69, y: 150, w: 33, d: 27, branchBase: 112, roof: 'rust',
+      },
+      {
+        id: 'archive', label: '苍穹档案馆', code: 'ARCH', kind: 'function',
+        x: -62, z: 36, y: 143, w: 33, d: 23, branchBase: 102, roof: 'rust',
+      },
+      {
+        id: 'forge', label: '赤炉工坊', code: 'FORGE', kind: 'function',
+        x: -68, z: -22, y: 124, w: 35, d: 29, branchBase: 88, roof: 'teal',
+      },
+      {
+        id: 'res-low', label: '低枝里坊', code: 'LOW', kind: 'residence',
+        x: -37, z: -59, y: 117, w: 31, d: 25, branchBase: 88, roof: 'teal',
+      },
+      {
+        id: 'res-west', label: '西枝里坊', code: 'WEST', kind: 'residence',
+        x: 17, z: -70, y: 146, w: 31, d: 25, branchBase: 106, roof: 'mix',
+      },
+      {
+        id: 'canopy-garden', label: '风铃冠庭', code: 'GARDEN', kind: 'garden',
+        x: 62, z: -36, y: 152, w: 23, d: 21, branchBase: 113, roof: 'teal',
+      },
+    ];
+
+    const ANCHOR_BY_ID = new Map(PLATFORM_ANCHORS.map((anchor) => [anchor.id, anchor]));
+    const BRANCH_RECORDS = [];
+    const CROWN_TIPS = [];
+    let forgeLightPosition = null;
+
+    /* =========================================================================
+       10 · EIGHT GREAT BRANCHES & HIGH CANOPY TWIGS
+       ========================================================================= */
+
+    function branchMaterial(x, y, z, t, seed = 0) {
+      const n = hash3(x, y, z, 141 + seed);
+      if (Math.sin(t * 57 + seed * 1.9) > 0.935) return hash3(x, y, z, 142) > 0.5 ? MAT.GOLD : MAT.BRONZE_LIGHT;
+      if (t < 0.3 && n < 0.2) return MAT.PATINA;
+      if (n < 0.09) return MAT.PATINA_DEEP;
+      if (n < 0.28) return MAT.BRONZE_DARK;
+      if (n < 0.75) return MAT.BRONZE;
+      if (n < 0.92) return MAT.BRONZE_LIGHT;
+      return MAT.GOLD;
+    }
+
+    function addBranchCollar(anchor, angle, baseY, seed) {
+      const center = trunkCenterAt(baseY);
+      for (let dy = -1; dy <= 3; dy++) {
+        const y = baseY + dy;
+        const radius = trunkRadius(y) + 1.05 + Math.max(0, 2 - Math.abs(dy)) * 0.35;
+        for (let da = -0.29; da <= 0.29; da += 0.025) {
+          const a = angle + da;
+          const x = Math.round(center.x + Math.cos(a) * radius);
+          const z = Math.round(center.z + Math.sin(a) * radius);
+          setV(x, y, z, hash3(x, y, z, seed) > 0.64 ? MAT.PATINA : MAT.BRONZE_DARK);
+          if (dy === 1 && Math.abs(da) < 0.06) setV(x, y, z, MAT.GOLD);
+        }
+      }
+    }
+
+    function buildTreeBranches() {
+      const outerAnchors = PLATFORM_ANCHORS.filter((anchor) => anchor.kind !== 'hub');
+
+      outerAnchors.forEach((anchor, index) => {
+        const angle = Math.atan2(anchor.z, anchor.x);
+        const baseY = anchor.branchBase;
+        const start = trunkCenterAt(baseY);
+        const targetRadius = Math.hypot(anchor.x, anchor.z);
+        const endY = anchor.y - 4;
+        const inset = clamp(trunkRadius(baseY) * 0.38, 2.5, 6.5);
+
+        const p0 = new THREE.Vector3(start.x, baseY, start.z);
+        const p1 = new THREE.Vector3(
+          start.x + Math.cos(angle) * (trunkRadius(baseY) + 2.6),
+          baseY + 2.6,
+          start.z + Math.sin(angle) * (trunkRadius(baseY) + 2.6)
+        );
+        const p2 = new THREE.Vector3(
+          Math.cos(angle) * (targetRadius * 0.52),
+          baseY + (endY - baseY) * 0.53,
+          Math.sin(angle) * (targetRadius * 0.52)
+        );
+        const p3 = new THREE.Vector3(
+          Math.cos(angle + 0.035) * (targetRadius * 0.8),
+          baseY + (endY - baseY) * 0.9,
+          Math.sin(angle + 0.035) * (targetRadius * 0.8)
+        );
+        const p4 = new THREE.Vector3(anchor.x, endY, anchor.z);
+        const curve = new THREE.CatmullRomCurve3([p0, p1, p2, p3, p4], false, 'catmullrom', 0.3);
+        const crownTip = { x: anchor.x, y: anchor.y, z: anchor.z, size: 0, seed: index };
+        const record = {
+          anchorId: anchor.id,
+          angle,
+          baseY,
+          endY,
+          curve,
+          crownTips: [],
+        };
+
+        tubeCurve(
+          curve,
+          (t) => lerp(5.9, 2.05, t) + 0.34 * Math.sin(t * Math.PI * 6 + index),
+          (x, y, z, t) => branchMaterial(x, y, z, t, index),
+          0.52
+        );
+
+        addBranchCollar(anchor, angle, baseY, 151 + index);
+
+        // Two secondary limbs leave the main branch before the platform and rise outside it.
+        for (let side = 0; side < 2; side++) {
+          const splitT = 0.46 + side * 0.07;
+          const split = curve.getPointAt(splitT);
+          const tipAngle = angle + (side === 0 ? 0.2 : -0.19) + (hash3(index, side, 9, 77) - 0.5) * 0.08;
+          const tipRadius = clamp(targetRadius + (side === 0 ? 11 : 6), 42, 82);
+          const tipY = 176 + ((index * 2 + side * 3) % 7) * 3;
+          const tipX = Math.cos(tipAngle) * tipRadius;
+          const tipZ = Math.sin(tipAngle) * tipRadius;
+          const outsideRadius = targetRadius + 4.5;
+          const secondary = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(split.x, split.y, split.z),
+            new THREE.Vector3(
+              Math.cos(angle + (side === 0 ? 0.06 : -0.055)) * outsideRadius,
+              anchor.y - 3,
+              Math.sin(angle + (side === 0 ? 0.06 : -0.055)) * outsideRadius
+            ),
+            new THREE.Vector3(
+              Math.cos(tipAngle) * (tipRadius * 0.76),
+              tipY - 7,
+              Math.sin(tipAngle) * (tipRadius * 0.76)
+            ),
+            new THREE.Vector3(tipX, tipY, tipZ),
+          ], false, 'catmullrom', 0.38);
+
+          tubeCurve(
+            secondary,
+            (t) => lerp(2.35, 0.62, t) + 0.25 * Math.sin(t * Math.PI * 4 + side),
+            (x, y, z, t) => branchMaterial(x, y, z, t, 180 + index * 2 + side),
+            0.55
+          );
+
+          // Mid-limb leaf fans break up the bare "wire" silhouette.
+          for (const u of [0.58, 0.76]) {
+            const p = secondary.getPointAt(u);
+            if (p.y > 172) {
+              CROWN_TIPS.push({
+                x: p.x + (hash3(index, side, Math.round(u * 100), 177) - 0.5) * 2,
+                y: p.y + 1,
+                z: p.z + (hash3(index, side, Math.round(u * 100), 178) - 0.5) * 2,
+                size: 3.2 + (side % 2),
+                seed: 270 + index * 9 + side * 3 + Math.round(u * 10),
+                supportX: p.x,
+                supportY: p.y,
+                supportZ: p.z,
+              });
+            }
+          }
+
+          // A tiny fork gives the leaf crown a hand-forged silhouette.
+          for (let twig = 0; twig < 2; twig++) {
+            const twigAngle = tipAngle + (twig === 0 ? 0.18 : -0.15);
+            const twigEnd = {
+              x: clamp(tipX + Math.cos(twigAngle) * (3.5 + twig * 2), -84, 84),
+              y: Math.min(TOP_LIMIT - 1, tipY + 2 + twig * 3),
+              z: clamp(tipZ + Math.sin(twigAngle) * (3.5 + twig * 2), -84, 84),
+            };
+            const twigCurve = new THREE.CatmullRomCurve3([
+              new THREE.Vector3(tipX, tipY, tipZ),
+              new THREE.Vector3((tipX + twigEnd.x) / 2, tipY + 1.5, (tipZ + twigEnd.z) / 2),
+              new THREE.Vector3(twigEnd.x, twigEnd.y, twigEnd.z),
+            ], false, 'catmullrom', 0.45);
+            tubeCurve(
+              twigCurve,
+              (t) => lerp(0.75, 0.35, t),
+              (x, y, z, t) => branchMaterial(x, y, z, t, 220 + index * 5 + side * 2 + twig),
+              0.7
+            );
+            const leafTip = {
+              x: twigEnd.x,
+              y: twigEnd.y + 1,
+              z: twigEnd.z,
+              size: 5 + (index + twig + side) % 3,
+              seed: 300 + index * 10 + side * 2 + twig,
+              supportX: twigEnd.x,
+              supportY: twigEnd.y,
+              supportZ: twigEnd.z,
+            };
+            CROWN_TIPS.push(leafTip);
+            record.crownTips.push(leafTip);
+          }
+
+          const tip = {
+            x: tipX,
+            y: tipY + 1,
+            z: tipZ,
+            size: 6 + ((index + side) % 3),
+            seed: 280 + index * 7 + side,
+            supportX: tipX,
+            supportY: tipY,
+            supportZ: tipZ,
+          };
+          CROWN_TIPS.push(tip);
+          record.crownTips.push(tip);
+        }
+
+        BRANCH_RECORDS.push(record);
+      });
+
+      buildCentralLeader();
+    }
+
+    function buildCentralLeader() {
+      const leader = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(0, 130, 0),
+        new THREE.Vector3(1.9, 143, -1.2),
+        new THREE.Vector3(-1.7, 157, 1.8),
+        new THREE.Vector3(1.2, 171, -1.4),
+        new THREE.Vector3(-0.8, 184, 0.8),
+        new THREE.Vector3(0, 194, 0),
+      ], false, 'catmullrom', 0.35);
+
+      tubeCurve(
+        leader,
+        (t) => lerp(3.05, 0.62, t) + 0.18 * Math.sin(t * Math.PI * 4),
+        (x, y, z, t) => branchMaterial(x, y, z, t, 333),
+        0.48
+      );
+
+      for (let i = 0; i < 6; i++) {
+        const t = 0.2 + i * 0.11;
+        const p = leader.getPointAt(t);
+        const a = i * (TAU / 6) + 0.28;
+        const reach = 19 + (i % 3) * 4;
+        const end = new THREE.Vector3(
+          Math.cos(a) * reach,
+          Math.min(TOP_LIMIT - 1, 178 + i * 3),
+          Math.sin(a) * reach
+        );
+        const arm = new THREE.CatmullRomCurve3([
+          p,
+          new THREE.Vector3(p.x + Math.cos(a) * reach * 0.46, p.y + 5, p.z + Math.sin(a) * reach * 0.46),
+          end,
+        ], false, 'catmullrom', 0.42);
+        tubeCurve(arm, (u) => lerp(1.5, 0.44, u), (x, y, z, u) =>
+          branchMaterial(x, y, z, u, 340 + i), 0.6
+        );
+        CROWN_TIPS.push({
+          x: end.x,
+          y: end.y,
+          z: end.z,
+          size: 5 + (i % 2),
+          seed: 360 + i,
+          supportX: end.x,
+          supportY: end.y,
+          supportZ: end.z,
+        });
+      }
+
+      // The last central spire is the literal Y=200 apex support.
+      for (let y = 190; y <= TOP_LIMIT; y++) {
+        setV(0, y, 0, y === TOP_LIMIT ? MAT.GOLD : MAT.BRONZE_DARK);
+      }
+      CROWN_TIPS.push({ x: 0, y: 194, z: 0, size: 7, seed: 401, apex: true, supportX: 0, supportY: 190, supportZ: 0 });
+    }
+
+    /* =========================================================================
+       11 · MULTI-TIER TREE-HEART HUB
+       ========================================================================= */
+
+    function buildHub() {
+      const hub = ANCHOR_BY_ID.get('hub');
+      const y = hub.y;
+      const inner = 12.2;
+      const outer = 36;
+
+      for (let layer = 0; layer < 3; layer++) {
+        ring(0, 0, y - layer, outer - layer * 0.35, inner + layer * 0.2, (x, z, d) => {
+          if (layer === 0 && (Math.abs(d - (outer - 1.3)) < 0.75 || Math.abs(d - (inner + 1.2)) < 0.7)) {
+            return hash3(x, y, z, 512) > 0.55 ? MAT.BRONZE_DARK : MAT.PATINA;
+          }
+          if (layer === 0 && hash3(x, y, z, 513) > 0.94) return MAT.PATINA;
+          return stoneTone(x, y - layer, z, 514);
+        });
+      }
+
+      ring(0, 0, y + 1, inner + 1.4, inner + 0.05, MAT.BRONZE_DARK);
+
+      // Radial floor inlays from the inner rim to the outer processional ring.
+      for (let i = 0; i < 16; i++) {
+        const a = (i / 16) * TAU;
+        for (let r = inner + 2; r <= outer - 2; r += 0.7) {
+          const x = Math.round(Math.cos(a) * r);
+          const z = Math.round(Math.sin(a) * r);
+          setV(x, y, z, i % 4 === 0 ? MAT.GOLD : MAT.PATINA_DEEP);
+        }
+      }
+
+      // Two concentric tiers form the circular council altar.
+      for (const tier of [
+        { outer: 28.5, inner: 12.2, y0: y + 2, height: 2 },
+        { outer: 20.2, inner: 12.2, y0: y + 5, height: 2 },
+      ]) {
+        for (let layer = 0; layer < tier.height; layer++) {
+          ring(0, 0, tier.y0 + layer, tier.outer - layer * 0.25, tier.inner, (x, z, d) => {
+            if (layer === tier.height - 1 && d > tier.outer - 2.2) return MAT.BRONZE_DARK;
+            return hash3(x, tier.y0 + layer, z, 515) > 0.9 ? MAT.STONE_MOSS : stoneTone(x, tier.y0 + layer, z, 516);
+          });
+        }
+      }
+
+      // Spoked bronze structure under the annulus.
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * TAU + 0.11;
+        const start = trunkCenterAt(y - 14);
+        const x0 = start.x + Math.cos(a) * (trunkRadius(y - 14) - 1.2);
+        const z0 = start.z + Math.sin(a) * (trunkRadius(y - 14) - 1.2);
+        const x1 = Math.cos(a) * (outer - 1.5);
+        const z1 = Math.sin(a) * (outer - 1.5);
+        strokeLine(x0, y - 14, z0, x1, y - 3, z1, 1.05, (x, yy, z) =>
+          hash3(x, yy, z, 517) > 0.75 ? MAT.PATINA : MAT.BRONZE_DARK
+        );
+      }
+
+      // Twelve stone-and-bronze pylons ring the open court.
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * TAU + 0.11;
+        const px = Math.round(Math.cos(a) * 32.8);
+        const pz = Math.round(Math.sin(a) * 32.8);
+        fillBox(px - 1, y + 1, pz - 1, px + 1, y + 6, pz + 1, (x, yy, z) =>
+          yy === y + 6 ? MAT.BRONZE_DARK : stoneTone(x, yy, z, 518)
+        );
+        setV(px, y + 7, pz, MAT.GOLD);
+        setV(px, y + 8, pz, MAT.LANTERN);
+      }
+
+      // Low processional crenellation; three wide gaps receive the stone viaducts.
+      const bridgeAngles = [18, 150, 198].map((d) => d * DEG);
+      for (let i = 0; i < 144; i++) {
+        const a = (i / 144) * TAU;
+        const nearBridge = bridgeAngles.some((ba) => Math.abs(wrappedAngle(a - ba)) < 0.11);
+        if (nearBridge) continue;
+        if (i % 2 !== 0) continue;
+        const x = Math.round(Math.cos(a) * 35.1);
+        const z = Math.round(Math.sin(a) * 35.1);
+        setV(x, y + 1, z, MAT.STONE_DARK);
+        if (i % 6 === 0) {
+          setV(x, y + 2, z, MAT.BRONZE_DARK);
+          setV(x, y + 3, z, MAT.LANTERN);
+        }
+      }
+
+      // Clear openings for the two vertical lift shafts.
+      clearCircularOpening(0, 0, y, 21, 250 * DEG, 2.8);
+      clearCircularOpening(0, 0, y, 25, 300 * DEG, 2.8);
+
+      // Council benches and reading lecterns.
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * TAU + 0.3;
+        const bx = Math.round(Math.cos(a) * 17.6);
+        const bz = Math.round(Math.sin(a) * 17.6);
+        if (i % 2 === 0) addBench(bx, y + 7, bz, i % 4 === 0);
+      }
+    }
+
+    function clearCircularOpening(cx, cz, y, radius, angle, openingRadius) {
+      const ox = Math.round(cx + Math.cos(angle) * radius);
+      const oz = Math.round(cz + Math.sin(angle) * radius);
+      const r = Math.ceil(openingRadius);
+      for (let dy = -4; dy <= 3; dy++) {
+        for (let dz = -r; dz <= r; dz++) {
+          for (let dx = -r; dx <= r; dx++) {
+            if (dx * dx + dz * dz > openingRadius * openingRadius) continue;
+            clearV(ox + dx, y + dy, oz + dz);
+          }
+        }
+      }
+    }
+
+    /* =========================================================================
+       12 · GENERIC BRANCH-BORNE STONE PLATFORMS + ARCH SUPPORTS
+       ========================================================================= */
+
+    function platformEdgePoint(anchor, towardX, towardZ, margin = 0.6) {
+      if (anchor.id === 'hub') {
+        const a = Math.atan2(towardZ - anchor.z, towardX - anchor.x);
+        return {
+          x: anchor.x + Math.cos(a) * (36 + margin),
+          z: anchor.z + Math.sin(a) * (36 + margin),
+          y: anchor.y,
+        };
+      }
+      const dx = towardX - anchor.x;
+      const dz = towardZ - anchor.z;
+      const length = Math.max(0.0001, Math.hypot(dx, dz));
+      const ux = dx / length;
+      const uz = dz / length;
+      const tx = Math.abs(ux) < 0.0001 ? Infinity : (anchor.w / 2 + margin) / Math.abs(ux);
+      const tz = Math.abs(uz) < 0.0001 ? Infinity : (anchor.d / 2 + margin) / Math.abs(uz);
+      const t = Math.min(tx, tz);
+      return {
+        x: anchor.x + ux * t,
+        z: anchor.z + uz * t,
+        y: anchor.y,
+      };
+    }
+
+    function footprintContains(anchor, dx, dz, extra = 0) {
+      if (anchor.id === 'hub') return Math.hypot(dx, dz) <= 36 + extra;
+      const hw = Math.floor(anchor.w / 2);
+      const hd = Math.floor(anchor.d / 2);
+      const cut = Math.max(2, Math.round(Math.min(anchor.w, anchor.d) * 0.12));
+      const cX = Math.max(0, Math.abs(dx) - (hw - cut + extra));
+      const cZ = Math.max(0, Math.abs(dz) - (hd - cut + extra));
+      return Math.abs(dx) <= hw + extra && Math.abs(dz) <= hd + extra && cX + cZ <= cut;
+    }
+
+    function buildPlatform(anchor) {
+      if (anchor.id === 'hub') return;
+      const hw = Math.floor(anchor.w / 2);
+      const hd = Math.floor(anchor.d / 2);
+      const cut = Math.max(2, Math.round(Math.min(anchor.w, anchor.d) * 0.12));
+
+      for (let layer = 0; layer < 3; layer++) {
+        const inset = layer * 2;
+        chamferDeck(anchor.x, anchor.z, anchor.y - layer, anchor.w - inset, anchor.d - inset, (x, yy, z) => {
+          if (layer === 0) {
+            return hash3(x, yy, z, 601) > 0.9 ? MAT.STONE_MOSS : stoneTone(x, yy, z, 602);
+          }
+          return stoneTone(x, yy, z, 603);
+        }, Math.max(1, cut - layer));
+      }
+
+      // Bright bronze rim along the top footprint.
+      for (let dz = -hd; dz <= hd; dz++) {
+        for (let dx = -hw; dx <= hw; dx++) {
+          if (!footprintContains(anchor, dx, dz)) continue;
+          let boundary = false;
+          for (const [ox, oz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            if (!footprintContains(anchor, dx + ox, dz + oz)) boundary = true;
+          }
+          if (boundary) {
+            setV(anchor.x + dx, anchor.y, anchor.z + dz, hash3(anchor.x + dx, anchor.y, anchor.z + dz, 604) > 0.55 ? MAT.BRONZE_DARK : MAT.PATINA);
+          }
+        }
+      }
+
+      // Inlaid cross of bronze on the upper platform deck.
+      for (let d = -Math.min(hw, hd) + 3; d <= Math.min(hw, hd) - 3; d++) {
+        setV(anchor.x + d, anchor.y, anchor.z, MAT.PATINA_DEEP);
+        setV(anchor.x, anchor.y, anchor.z + d, MAT.PATINA_DEEP);
+      }
+
+      // Four diagonal bronze struts tied into the terminal branch node.
+      const branchCenterY = anchor.y - 4;
+      for (const sx of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          const px = anchor.x + sx * (hw * 0.62);
+          const pz = anchor.z + sz * (hd * 0.62);
+          strokeLine(
+            anchor.x, branchCenterY, anchor.z,
+            px, anchor.y - 3, pz,
+            1.15,
+            (x, y, z) => hash3(x, y, z, 610) > 0.72 ? MAT.PATINA : MAT.BRONZE_DARK
+          );
+        }
+      }
+
+      // Two crossed stone arch ribs tucked beneath the deck.
+      for (const axis of ['x', 'z']) {
+        for (const lateral of [-0.22, 0.22]) {
+          const offset = (axis === 'x' ? hd : hw) * lateral;
+          const startX = axis === 'x' ? anchor.x - hw * 0.72 : anchor.x + offset;
+          const startZ = axis === 'x' ? anchor.z + offset : anchor.z - hd * 0.72;
+          const endX = axis === 'x' ? anchor.x + hw * 0.72 : anchor.x + offset;
+          const endZ = axis === 'x' ? anchor.z + offset : anchor.z + hd * 0.72;
+          const steps = Math.max(8, Math.ceil((axis === 'x' ? anchor.w : anchor.d) * 1.4));
+          for (let i = 0; i <= steps; i++) {
+            const t = i / steps;
+            const px = lerp(startX, endX, t);
+            const pz = lerp(startZ, endZ, t);
+            const py = anchor.y - 8 + 5 * Math.sin(Math.PI * t);
+            stampSphere(px, py, pz, 0.65, (x, y, z) =>
+              hash3(x, y, z, 611) > 0.7 ? MAT.BRONZE_DARK : MAT.STONE_DARK
+            );
+          }
+        }
+      }
+
+      // Low corner parapets leave every mid-side open for bridges.
+      for (const sx of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          for (let i = 0; i <= 5; i++) {
+            const x = anchor.x + sx * (hw - i);
+            const z = anchor.z + sz * hd;
+            if (footprintContains(anchor, sx * (hw - i), sz * hd)) {
+              setV(x, anchor.y + 1, z, MAT.STONE_DARK);
+              if (i % 2 === 0) setV(x, anchor.y + 2, z, MAT.BRONZE_DARK);
+            }
+            const x2 = anchor.x + sx * hw;
+            const z2 = anchor.z + sz * (hd - i);
+            if (footprintContains(anchor, sx * hw, sz * (hd - i))) {
+              setV(x2, anchor.y + 1, z2, MAT.STONE_DARK);
+              if (i % 2 === 0) setV(x2, anchor.y + 2, z2, MAT.BRONZE_DARK);
+            }
+          }
+        }
+      }
+
+      // Two corner braziers.
+      addStandingLantern(anchor.x - hw + 3, anchor.y, anchor.z + hd - 3, true);
+      addStandingLantern(anchor.x + hw - 3, anchor.y, anchor.z - hd + 3, true);
+    }
+
+    function buildOuterPlatforms() {
+      for (const anchor of PLATFORM_ANCHORS) {
+        if (anchor.kind !== 'hub') buildPlatform(anchor);
+      }
+    }
+
+    /* =========================================================================
+       13 · STONE HOUSES · PITCHED ROOFS, JETTIES, BALCONIES, WINDOWS
+       ========================================================================= */
+
+    function placeRecessedWindow(x, y, z, nx, nz, seed, lit = true) {
+      const tangentX = nz;
+      const tangentZ = -nx;
+      const wide = hash3(x, y, z, seed + 11) > 0.45;
+      const cells = wide
+        ? [[x, z], [x + tangentX, z + tangentZ]]
+        : [[x, z]];
+      const surfaceGlow = hash3(x, y, z, seed + 17) > 0.34;
+
+      for (const [wx, wz] of cells) {
+        if (surfaceGlow) {
+          setV(wx, y, wz, lit ? MAT.WINDOW : MAT.BASALT);
+        } else {
+          clearV(wx, y, wz);
+          setV(wx - nx, y, wz - nz, lit ? MAT.WINDOW : MAT.BASALT);
+        }
+        setV(wx + nx, y - 1, wz + nz, MAT.STONE_LIGHT);
+        setV(wx, y + 1, wz, MAT.WOOD_DARK);
+      }
+
+      // Frames sit at both ends of the sill rather than blocking the opening.
+      const frameOffsets = wide ? [-1, 2] : [-1, 1];
+      for (const offset of frameOffsets) {
+        setV(x + tangentX * offset, y, z + tangentZ * offset, MAT.BRONZE_DARK);
+      }
+    }
+
+    function placeDoor(x, y, z, nx, nz, seed) {
+      clearV(x, y, z);
+      clearV(x, y + 1, z);
+      setV(x - nx, y, z - nz, MAT.WOOD_DARK);
+      setV(x - nx, y + 1, z - nz, MAT.WOOD);
+      setV(x + nx, y - 1, z + nz, MAT.STONE_LIGHT);
+      setV(x, y + 2, z, MAT.WOOD_DARK);
+      setV(x, y + 3, z, MAT.BRONZE_DARK);
+      setV(x + nx, y + 3, z + nz, MAT.BRONZE_DARK);
+      setV(x + nx, y + 2, z + nz, MAT.LANTERN);
+      if (hash3(x, y, z, seed) > 0.62) setV(x + nx, y + 4, z + nz, MAT.BRONZE_LIGHT);
+    }
+
+    function addGableRoof(x0, z0, x1, z1, baseY, axis, roofType, seed = 0) {
+      const baseMat = roofType === 'rust' ? MAT.ROOF_RUST : MAT.ROOF_TEAL;
+      const roofMat = (x, y, z) => roofTone(baseMat, x, y, z);
+      let ridgeY = baseY;
+
+      if (axis === 'z') {
+        const half = Math.ceil((x1 - x0) / 2);
+        for (let k = 0; k <= half; k++) {
+          const xa = x0 + k;
+          const xb = x1 - k;
+          if (xa > xb) break;
+          const y = baseY + k;
+          if (y > TOP_LIMIT) break;
+          for (let z = z0; z <= z1; z++) {
+            setV(xa, y, z, roofMat(xa, y, z));
+            setV(xb, y, z, roofMat(xb, y, z));
+            if (k > 0) {
+              setV(xa, y - 1, z, roofMat(xa, y - 1, z));
+              setV(xb, y - 1, z, roofMat(xb, y - 1, z));
+            }
+          }
+          // Stone gable in-fill, inset one block from the eave.
+          for (let z = z0 + 1; z <= z1 - 1; z++) {
+            setV(x0 + 1, y, z, hash3(x0 + 1, y, z, 701 + seed) > 0.58 ? MAT.WOOD_DARK : MAT.STONE_DARK);
+            setV(x1 - 1, y, z, hash3(x1 - 1, y, z, 702 + seed) > 0.58 ? MAT.WOOD_DARK : MAT.STONE_DARK);
+          }
+          ridgeY = y;
+          if (xa === xb) {
+            for (let z = z0; z <= z1; z += 3) setV(xa, y + 1, z, MAT.GOLD);
+          }
+        }
+        setV(x0, baseY, z0, MAT.BRONZE_DARK);
+        setV(x0, baseY, z1, MAT.BRONZE_DARK);
+        setV(x1, baseY, z0, MAT.BRONZE_DARK);
+        setV(x1, baseY, z1, MAT.BRONZE_DARK);
+      } else {
+        const half = Math.ceil((z1 - z0) / 2);
+        for (let k = 0; k <= half; k++) {
+          const za = z0 + k;
+          const zb = z1 - k;
+          if (za > zb) break;
+          const y = baseY + k;
+          if (y > TOP_LIMIT) break;
+          for (let x = x0; x <= x1; x++) {
+            setV(x, y, za, roofMat(x, y, za));
+            setV(x, y, zb, roofMat(x, y, zb));
+            if (k > 0) {
+              setV(x, y - 1, za, roofMat(x, y - 1, za));
+              setV(x, y - 1, zb, roofMat(x, y - 1, zb));
+            }
+          }
+          for (let x = x0 + 1; x <= x1 - 1; x++) {
+            setV(x, y, z0 + 1, hash3(x, y, z0 + 1, 703 + seed) > 0.58 ? MAT.WOOD_DARK : MAT.STONE_DARK);
+            setV(x, y, z1 - 1, hash3(x, y, z1 - 1, 704 + seed) > 0.58 ? MAT.WOOD_DARK : MAT.STONE_DARK);
+          }
+          ridgeY = y;
+          if (za === zb) {
+            for (let x = x0; x <= x1; x += 3) setV(x, y + 1, za, MAT.GOLD);
+          }
+        }
+        setV(x0, baseY, z0, MAT.BRONZE_DARK);
+        setV(x0, baseY, z1, MAT.BRONZE_DARK);
+        setV(x1, baseY, z0, MAT.BRONZE_DARK);
+        setV(x1, baseY, z1, MAT.BRONZE_DARK);
+      }
+
+      // Bronze ridge finials.
+      if (axis === 'z') {
+        const midZ = Math.round((z0 + z1) / 2);
+        setV(x0 + Math.floor((x1 - x0) / 2), ridgeY + 1, midZ, MAT.BRONZE_LIGHT);
+        setV(x0 + Math.floor((x1 - x0) / 2), ridgeY + 2, midZ, MAT.LANTERN);
+      } else {
+        const midX = Math.round((x0 + x1) / 2);
+        setV(midX, ridgeY + 1, z0 + Math.floor((z1 - z0) / 2), MAT.BRONZE_LIGHT);
+        setV(midX, ridgeY + 2, z0 + Math.floor((z1 - z0) / 2), MAT.LANTERN);
+      }
+      return ridgeY;
+    }
+
+    function buildHouse(config) {
+      const {
+        cx, cz, baseY, w, d, floors, roof = 'teal', axis = 'x', seed = 1, tower = false,
+      } = config;
+      const hw = Math.floor(w / 2);
+      const hd = Math.floor(d / 2);
+      const x0 = cx - hw, x1 = cx + hw;
+      const z0 = cz - hd, z1 = cz + hd;
+
+      // Stone floor slab; every house has a positive contact with the platform.
+      fillBox(x0, baseY, z0, x1, baseY, z1, (x, y, z) =>
+        hash3(x, y, z, 720 + seed) > 0.84 ? MAT.STONE_MOSS : stoneTone(x, y, z, 721 + seed)
+      );
+
+      let levelX0 = x0, levelX1 = x1, levelZ0 = z0, levelZ1 = z1;
+      for (let level = 0; level < floors; level++) {
+        const overhang = floors >= 3 && level === floors - 1 ? 1 : 0;
+        levelX0 = x0 - overhang;
+        levelX1 = x1 + overhang;
+        levelZ0 = z0 - overhang;
+        levelZ1 = z1 + overhang;
+        const levelBase = baseY + level * 4;
+
+        if (level > 0) {
+          fillBox(levelX0, levelBase, levelZ0, levelX1, levelBase, levelZ1, (x, y, z) =>
+            hash3(x, y, z, 722 + seed) > 0.72 ? MAT.WOOD_DARK : MAT.WOOD
+          );
+          // Small corbels under the jetty.
+          if (overhang) {
+            for (let t = levelX0 + 2; t <= levelX1 - 2; t += 3) {
+              setV(t, levelBase - 1, levelZ0, MAT.WOOD_DARK);
+              setV(t, levelBase - 1, levelZ1, MAT.WOOD_DARK);
+            }
+            for (let t = levelZ0 + 2; t <= levelZ1 - 2; t += 3) {
+              setV(levelX0, levelBase - 1, t, MAT.WOOD_DARK);
+              setV(levelX1, levelBase - 1, t, MAT.WOOD_DARK);
+            }
+          }
+        }
+
+        // Hollow stone shell, one block thick.
+        for (let yy = levelBase + 1; yy <= levelBase + 3; yy++) {
+          shellBox(levelX0, yy, levelZ0, levelX1, yy, levelZ1, (x, y, z) => {
+            if (x === levelX0 && z === levelZ0) return MAT.WOOD_DARK;
+            if (x === levelX1 && z === levelZ0) return MAT.WOOD_DARK;
+            if (x === levelX0 && z === levelZ1) return MAT.WOOD_DARK;
+            if (x === levelX1 && z === levelZ1) return MAT.WOOD_DARK;
+            if (y === levelBase + 1) return hash3(x, y, z, 723 + seed) > 0.82 ? MAT.WOOD_DARK : stoneTone(x, y, z, 724 + seed);
+            return hash3(x, y, z, 725 + seed) > 0.91 ? MAT.STONE_MOSS : stoneTone(x, y, z, 726 + seed);
+          });
+        }
+
+        // Timber frame corners.
+        for (let yy = levelBase + 1; yy <= levelBase + 3; yy++) {
+          setV(levelX0, yy, levelZ0, MAT.WOOD_DARK);
+          setV(levelX1, yy, levelZ0, MAT.WOOD_DARK);
+          setV(levelX0, yy, levelZ1, MAT.WOOD_DARK);
+          setV(levelX1, yy, levelZ1, MAT.WOOD_DARK);
+        }
+
+        // Two or three windows per visible face.
+        const wy = levelBase + 2;
+        const litA = hash3(level, seed, 4, 727) > 0.08;
+        const litB = hash3(level, seed, 8, 728) > 0.14;
+        for (const wx of [levelX0 + 2, levelX1 - 2]) {
+          if (wx <= levelX0 || wx >= levelX1) continue;
+          placeRecessedWindow(wx, wy, levelZ1, 0, 1, 730 + seed + level, litA);
+          if (level < floors - 1 || hash3(wx, wy, levelZ1, 731) > 0.55) {
+            placeRecessedWindow(wx, wy, levelZ0, 0, -1, 732 + seed + level, litB);
+          }
+        }
+        for (const wz of [levelZ0 + 2, levelZ1 - 2]) {
+          if (wz <= levelZ0 || wz >= levelZ1) continue;
+          placeRecessedWindow(levelX0, wy, wz, -1, 0, 733 + seed + level, litB);
+          placeRecessedWindow(levelX1, wy, wz, 1, 0, 734 + seed + level, litA);
+        }
+
+        // Ground-floor doorway faces the central lane.
+        if (level === 0) {
+          placeDoor(cx, baseY + 1, z1, 0, 1, seed);
+          setV(cx - 2, baseY + 1, z1 + 1, MAT.BRONZE_DARK);
+          setV(cx + 2, baseY + 1, z1 + 1, MAT.BRONZE_DARK);
+        }
+
+        // A supported cantilever balcony on the second storey.
+        if (level === 1) {
+          const balconyY = levelBase;
+          for (let x = cx - 3; x <= cx + 3; x++) {
+            setV(x, balconyY, levelZ1 + 1, MAT.WOOD);
+            setV(x, balconyY, levelZ1 + 2, MAT.WOOD_DARK);
+            setV(x, balconyY + 1, levelZ1 + 2, MAT.BRONZE_DARK);
+            if (x % 2 === 0) setV(x, balconyY + 2, levelZ1 + 2, MAT.BRONZE_DARK);
+          }
+          for (const x of [cx - 3, cx - 1, cx + 1, cx + 3]) {
+            strokeLine(x, balconyY - 2, levelZ1, x, balconyY - 1, levelZ1 + 2, 0.45, MAT.WOOD_DARK);
+          }
+          clearV(cx, balconyY + 1, levelZ1);
+          setV(cx, balconyY + 1, levelZ1 - 1, MAT.WINDOW);
+        }
+      }
+
+      const bodyTop = baseY + floors * 4 - 1;
+      const roofBase = bodyTop + 1;
+      const roofMat = roof === 'rust' ? MAT.ROOF_RUST : MAT.ROOF_TEAL;
+      const ridgeY = addGableRoof(
+        levelX0 - 1, levelZ0 - 1, levelX1 + 1, levelZ1 + 1,
+        roofBase, axis, roof === 'mix' ? (seed % 2 ? 'rust' : 'teal') : roof, seed
+      );
+
+      // A slender watch turret grows out of the roof, giving each quarter its
+      // own vertical landmark without introducing any unsupported mass.
+      if (tower) {
+        const towerX0 = seed % 2 === 0 ? levelX0 + 1 : levelX1 - 3;
+        const towerZ0 = levelZ0 + 1;
+        const towerX1 = towerX0 + 2;
+        const towerZ1 = towerZ0 + 2;
+        const towerBase = bodyTop - 2;
+        const towerTop = Math.min(TOP_LIMIT - 4, bodyTop + 9);
+        for (let yy = towerBase; yy <= towerTop; yy++) {
+          shellBox(towerX0, yy, towerZ0, towerX1, yy, towerZ1, (x, y, z) => {
+            if (yy % 4 === 0) return MAT.WOOD_DARK;
+            return hash3(x, y, z, 750 + seed) > 0.8 ? MAT.STONE_DARK : stoneTone(x, y, z, 751 + seed);
+          });
+        }
+
+        // Tall glowing slit on the outward face.
+        const faceX = towerX1;
+        for (let yy = towerTop - 4; yy <= towerTop - 2; yy++) {
+          clearV(faceX, yy, towerZ0 + 1);
+          setV(faceX - 1, yy, towerZ0 + 1, MAT.WINDOW);
+        }
+        setV(faceX, towerTop - 5, towerZ0 + 1, MAT.STONE_LIGHT);
+
+        const turretCenterX = towerX0 + 1;
+        const turretCenterZ = towerZ0 + 1;
+        const capMat = roof === 'rust' ? MAT.ROOF_RUST : MAT.ROOF_TEAL;
+        if (towerTop + 1 <= TOP_LIMIT) {
+          chamferDeck(turretCenterX, turretCenterZ, towerTop + 1, 5, 5, (x, y, z) => roofTone(capMat, x, y, z), 1);
+        }
+        if (towerTop + 2 <= TOP_LIMIT) {
+          setV(turretCenterX, towerTop + 2, turretCenterZ, MAT.BRONZE_DARK);
+          setV(turretCenterX - 1, towerTop + 2, turretCenterZ, MAT.PATINA);
+          setV(turretCenterX + 1, towerTop + 2, turretCenterZ, MAT.PATINA);
+          setV(turretCenterX, towerTop + 2, turretCenterZ - 1, MAT.PATINA);
+          setV(turretCenterX, towerTop + 2, turretCenterZ + 1, MAT.PATINA);
+        }
+        if (towerTop + 3 <= TOP_LIMIT) setV(turretCenterX, towerTop + 3, turretCenterZ, MAT.GOLD);
+        if (towerTop + 4 <= TOP_LIMIT) setV(turretCenterX, towerTop + 4, turretCenterZ, MAT.LANTERN);
+      }
+
+      // Stone chimney breaks the roof silhouette.
+      const chimneyX = levelX1 - 2;
+      const chimneyZ = levelZ0 + 2;
+      const chimneyTop = Math.min(TOP_LIMIT, ridgeY + 3 + (seed % 3));
+      for (let yy = roofBase - 1; yy <= chimneyTop; yy++) {
+        setV(chimneyX, yy, chimneyZ, hash3(chimneyX, yy, chimneyZ, 740 + seed) > 0.72 ? MAT.BRONZE_DARK : MAT.BASALT);
+        if (yy % 6 === 0) setV(chimneyX, yy, chimneyZ + 1, MAT.BRONZE_DARK);
+      }
+      setV(chimneyX, chimneyTop + 1, chimneyZ, MAT.BRONZE_DARK);
+
+      // Ridge weather-vane, anchored to the roof.
+      const midX = Math.round((levelX0 + levelX1) / 2);
+      const midZ = Math.round((levelZ0 + levelZ1) / 2);
+      setV(midX, ridgeY + 2, midZ, MAT.BRONZE_DARK);
+      setV(midX, ridgeY + 3, midZ, MAT.PATINA);
+
+      return ridgeY;
+    }
+
+    /* =========================================================================
+       14 · RESIDENTIAL QUARTERS · FOUR TERRACED TREE-BRANCH NEIGHBOURHOODS
+       ========================================================================= */
+
+    const RESIDENTIAL_LAYOUTS = {
+      'res-sun': [
+        { dx: -8, dz: -6, w: 11, d: 9, floors: 3, roof: 'teal', axis: 'x', seed: 11 },
+        { dx: 8, dz: -6, w: 9, d: 9, floors: 2, roof: 'rust', axis: 'z', seed: 12 },
+        { dx: -8, dz: 7, w: 11, d: 9, floors: 4, roof: 'rust', axis: 'z', seed: 13, tower: true },
+        { dx: 8, dz: 7, w: 10, d: 9, floors: 3, roof: 'teal', axis: 'x', seed: 14 },
+      ],
+      'res-high': [
+        { dx: -8, dz: -6, w: 10, d: 9, floors: 2, roof: 'rust', axis: 'x', seed: 21 },
+        { dx: 8, dz: -6, w: 11, d: 9, floors: 3, roof: 'teal', axis: 'z', seed: 22 },
+        { dx: -8, dz: 6, w: 11, d: 9, floors: 3, roof: 'teal', axis: 'x', seed: 23 },
+        { dx: 8, dz: 6, w: 10, d: 9, floors: 4, roof: 'rust', axis: 'z', seed: 24, tower: true },
+      ],
+      'res-low': [
+        { dx: -7, dz: -6, w: 10, d: 7, floors: 2, roof: 'teal', axis: 'z', seed: 31 },
+        { dx: 7, dz: -6, w: 9, d: 7, floors: 3, roof: 'rust', axis: 'x', seed: 32 },
+        { dx: -7, dz: 6, w: 10, d: 7, floors: 3, roof: 'rust', axis: 'x', seed: 33, tower: true },
+        { dx: 7, dz: 6, w: 9, d: 7, floors: 4, roof: 'teal', axis: 'z', seed: 34 },
+      ],
+      'res-west': [
+        { dx: -7, dz: -6, w: 10, d: 7, floors: 3, roof: 'rust', axis: 'x', seed: 41, tower: true },
+        { dx: 7, dz: -6, w: 9, d: 7, floors: 2, roof: 'teal', axis: 'z', seed: 42 },
+        { dx: -7, dz: 6, w: 10, d: 7, floors: 4, roof: 'teal', axis: 'z', seed: 43 },
+        { dx: 7, dz: 6, w: 9, d: 7, floors: 3, roof: 'rust', axis: 'x', seed: 44 },
+      ],
+    };
+
+    function buildResidentialArea(anchor) {
+      const hw = Math.floor(anchor.w / 2);
+      const hd = Math.floor(anchor.d / 2);
+      const layouts = RESIDENTIAL_LAYOUTS[anchor.id];
+
+      // Raised rear terrace accommodates the second row of houses.
+      for (let y = anchor.y + 1; y <= anchor.y + 2; y++) {
+        for (let dz = 2; dz <= hd - 1; dz++) {
+          for (let dx = -hw + 2; dx <= hw - 2; dx++) {
+            setV(anchor.x + dx, y, anchor.z + dz, y === anchor.y + 2
+              ? (hash3(anchor.x + dx, y, anchor.z + dz, 801) > 0.9 ? MAT.STONE_MOSS : stoneTone(anchor.x + dx, y, anchor.z + dz, 802))
+              : stoneTone(anchor.x + dx, y, anchor.z + dz, 803)
+            );
+          }
+        }
+      }
+
+      // Narrow central stair from lower lane to raised rear terrace.
+      for (let step = 0; step < 2; step++) {
+        const sy = anchor.y + 1 + step;
+        const sz = anchor.z + 2 + step;
+        fillBox(anchor.x - 1, sy, sz, anchor.x + 1, sy, sz + 1, step === 0 ? MAT.STONE_LIGHT : MAT.STONE);
+        setV(anchor.x - 2, sy + 1, sz, MAT.BRONZE_DARK);
+        setV(anchor.x + 2, sy + 1, sz, MAT.BRONZE_DARK);
+      }
+
+      // Retaining front lip, broken in the middle for the stair.
+      for (let dx = -hw + 2; dx <= hw - 2; dx++) {
+        if (Math.abs(dx) <= 2) continue;
+        setV(anchor.x + dx, anchor.y + 3, anchor.z + 2, MAT.STONE_DARK);
+        if (dx % 4 === 0) setV(anchor.x + dx, anchor.y + 4, anchor.z + 2, MAT.BRONZE_DARK);
+      }
+
+      // Inlaid lane: two dark bronze lines with pale stone treads.
+      for (let dz = -hd + 2; dz <= hd - 2; dz++) {
+        setV(anchor.x - 2, anchor.y, anchor.z + dz, MAT.BRONZE_DARK);
+        setV(anchor.x + 2, anchor.y, anchor.z + dz, MAT.BRONZE_DARK);
+      }
+
+      for (let i = 0; i < layouts.length; i++) {
+        const house = layouts[i];
+        const raised = house.dz > 0;
+        buildHouse({
+          cx: anchor.x + house.dx,
+          cz: anchor.z + house.dz,
+          baseY: anchor.y + (raised ? 3 : 1),
+          w: house.w,
+          d: house.d,
+          floors: house.floors,
+          roof: house.roof,
+          axis: house.axis,
+          seed: house.seed,
+          tower: Boolean(house.tower),
+        });
+      }
+
+      // A pair of lamps at the rear stair threshold.
+      addStandingLantern(anchor.x - 3, anchor.y + 2, anchor.z + 3, false);
+      addStandingLantern(anchor.x + 3, anchor.y + 2, anchor.z + 3, false);
+
+      // Laundry / banner strips below the high windows.
+      for (const dx of [-hw + 4, hw - 4]) {
+        for (let y = anchor.y + 4; y <= anchor.y + 7; y++) {
+          setV(anchor.x + dx, y, anchor.z + hd - 1, y % 3 === 0 ? MAT.ROOF_RUST : MAT.WOOD_DARK);
+        }
+      }
+    }
+
+    function buildResidentialSites() {
+      for (const anchor of PLATFORM_ANCHORS) {
+        if (anchor.kind === 'residence') buildResidentialArea(anchor);
+      }
+    }
+
+    /* =========================================================================
+       15 · OBSERVATORY · RINGED ASTROLOGICAL SPIRE
+       ========================================================================= */
+
+    function buildObservatory(anchor) {
+      const y = anchor.y;
+      const cx = anchor.x;
+      const cz = anchor.z;
+
+      // Stone plinth and shallow telescopic dais.
+      disc(cx, cz, y + 1, 7.4, (x, z) => stoneTone(x, y + 1, z, 900), 0);
+      disc(cx, cz, y + 2, 6.6, (x, z, d) => d > 5.2 ? MAT.BRONZE_DARK : stoneTone(x, y + 2, z, 901), 0);
+      ring(cx, cz, y + 3, 6.4, 4.4, MAT.STONE_LIGHT);
+      ring(cx, cz, y + 3, 4.0, 3.1, MAT.PATINA_DEEP);
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * TAU;
+        setV(Math.round(cx + Math.cos(a) * 5.3), y + 3, Math.round(cz + Math.sin(a) * 5.3), MAT.GOLD);
+      }
+
+      // Hollow tapered stone shaft.
+      for (let yy = y + 4; yy <= y + 37; yy++) {
+        const t = (yy - (y + 4)) / 33;
+        const radius = lerp(4.7, 3.1, t) + 0.16 * Math.sin(t * Math.PI * 5);
+        ring(cx, cz, yy, radius, Math.max(2.1, radius - 1.15), (x, z) => {
+          if (yy % 11 === 0 && hash3(x, yy, z, 902) > 0.5) return MAT.BRONZE_DARK;
+          return hash3(x, yy, z, 903) > 0.9 ? MAT.STONE_MOSS : stoneTone(x, yy, z, 904);
+        });
+      }
+
+      // Slender bronze ribs and three collar bands.
+      for (let yy = y + 4; yy <= y + 37; yy++) {
+        const t = (yy - (y + 4)) / 33;
+        const radius = lerp(4.7, 3.1, t) + 0.32;
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * TAU + 0.2;
+          setV(
+            Math.round(cx + Math.cos(a) * radius),
+            yy,
+            Math.round(cz + Math.sin(a) * radius),
+            i % 3 === 0 ? MAT.PATINA : MAT.BRONZE_DARK
+          );
+        }
+      }
+      for (const [bandY, extra] of [[y + 13, 0.55], [y + 25, 0.45], [y + 35, 0.35]]) {
+        const t = (bandY - (y + 4)) / 33;
+        const radius = lerp(4.7, 3.1, t) + extra;
+        for (let i = 0; i < 56; i++) {
+          const a = (i / 56) * TAU;
+          setV(
+            Math.round(cx + Math.cos(a) * radius),
+            bandY,
+            Math.round(cz + Math.sin(a) * radius),
+            i % 7 === 0 ? MAT.GOLD : MAT.BRONZE_LIGHT
+          );
+        }
+      }
+
+      // Four small buttress roots at the base.
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * TAU + 0.2;
+        strokeLine(
+          cx + Math.cos(a) * 5.6, y + 4, cz + Math.sin(a) * 5.6,
+          cx + Math.cos(a) * 7.2, y + 1, cz + Math.sin(a) * 7.2,
+          0.8, MAT.BRONZE_DARK
+        );
+      }
+
+      // Warm slit windows.
+      for (const [level, offset] of [[y + 10, 0.4], [y + 17, 2.0], [y + 24, 3.6], [y + 31, 5.2]]) {
+        const t = (level - (y + 4)) / 33;
+        const radius = lerp(4.7, 3.1, t) + 0.4;
+        for (let i = 0; i < 4; i++) {
+          const a = offset + i * (Math.PI / 2);
+          const wx = Math.round(cx + Math.cos(a) * radius);
+          const wz = Math.round(cz + Math.sin(a) * radius);
+          setV(wx, level, wz, MAT.WINDOW);
+          setV(Math.round(cx + Math.cos(a + 0.12) * radius), level, Math.round(cz + Math.sin(a + 0.12) * radius), MAT.BRONZE_DARK);
+        }
+      }
+
+      // Dark timber door and its bronze lintel, facing the hub.
+      const doorAngle = Math.atan2(-cz, -cx);
+      for (let da = -0.09; da <= 0.09; da += 0.045) {
+        for (let yy = y + 4; yy <= y + 7; yy++) {
+          const rr = 4.85 - (yy - (y + 4)) * 0.04;
+          const wx = Math.round(cx + Math.cos(doorAngle + da) * rr);
+          const wz = Math.round(cz + Math.sin(doorAngle + da) * rr);
+          setV(wx, yy, wz, yy < y + 6 ? MAT.WOOD_DARK : MAT.BRONZE_DARK);
+        }
+      }
+      setV(Math.round(cx + Math.cos(doorAngle) * 4.2), y + 7, Math.round(cz + Math.sin(doorAngle) * 4.2), MAT.LANTERN);
+
+      // Upper balcony ring.
+      for (let layer = 0; layer < 2; layer++) {
+        ring(cx, cz, y + 38 + layer, 7.6 - layer * 0.3, 3.15, (x, z) =>
+          stoneTone(x, y + 38 + layer, z, 905)
+        );
+      }
+      for (let i = 0; i < 24; i++) {
+        const a = (i / 24) * TAU;
+        const bx = Math.round(cx + Math.cos(a) * 7.2);
+        const bz = Math.round(cz + Math.sin(a) * 7.2);
+        setV(bx, y + 40, bz, i % 3 === 0 ? MAT.BRONZE_LIGHT : MAT.BRONZE_DARK);
+        if (i % 6 === 0) setV(bx, y + 41, bz, MAT.LANTERN);
+      }
+
+      // Stepped conical roof.
+      for (let k = 0; k < 9; k++) {
+        const radius = Math.max(0.7, 7.5 - k * 0.82);
+        const yy = y + 40 + k;
+        disc(cx, cz, yy, radius, (x, z, d) => {
+          if (d > radius - 1.1 && k % 2 === 0) return MAT.BRONZE_DARK;
+          return roofTone(k % 3 === 0 ? MAT.ROOF_TEAL : MAT.ROOF_RUST, x, yy, z);
+        }, Math.max(0, radius - 1.6));
+      }
+
+      // Bronze mast.
+      for (let yy = y + 39; yy <= y + 56; yy++) {
+        setV(cx, yy, cz, yy % 7 === 0 ? MAT.GOLD : MAT.BRONZE_DARK);
+        if (yy % 5 === 0) {
+          setV(cx + 1, yy, cz, MAT.BRONZE_LIGHT);
+          setV(cx - 1, yy, cz, MAT.BRONZE_LIGHT);
+          setV(cx, yy, cz + 1, MAT.BRONZE_LIGHT);
+          setV(cx, yy, cz - 1, MAT.BRONZE_LIGHT);
+        }
+      }
+
+      // Open bronze star ring at Y=188.
+      const starY = Math.min(TOP_LIMIT, y + 48);
+      for (let i = 0; i < 72; i++) {
+        const a = (i / 72) * TAU;
+        const sx = Math.round(cx + Math.cos(a) * 9);
+        const sz = Math.round(cz + Math.sin(a) * 9);
+        setV(sx, starY, sz, i % 6 === 0 ? MAT.PATINA : MAT.BRONZE_DARK);
+      }
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * TAU + 0.18;
+        for (let r = 2; r <= 8.6; r += 0.65) {
+          const sx = Math.round(cx + Math.cos(a) * r);
+          const sz = Math.round(cz + Math.sin(a) * r);
+          setV(sx, starY, sz, i % 2 === 0 ? MAT.GOLD : MAT.BRONZE_LIGHT);
+        }
+        const nx = Math.round(cx + Math.cos(a) * 9);
+        const nz = Math.round(cz + Math.sin(a) * 9);
+        setV(nx, starY, nz, MAT.STAR);
+        setV(nx, starY + 1, nz, MAT.WINDOW);
+      }
+
+      // Two crossed vertical armillary rings make the observatory read at a distance.
+      for (const axis of ['x', 'z']) {
+        for (let i = 0; i < 72; i++) {
+          const a = (i / 72) * TAU;
+          const rx = axis === 'x' ? Math.cos(a) * 7 : 0;
+          const rz = axis === 'z' ? Math.cos(a) * 7 : 0;
+          const sy = Math.round(starY + Math.sin(a) * 7);
+          setV(
+            Math.round(cx + rx),
+            sy,
+            Math.round(cz + rz),
+            i % 9 === 0 ? MAT.STAR : (i % 3 === 0 ? MAT.BRONZE_LIGHT : MAT.BRONZE_DARK)
+          );
+        }
+        for (const sign of [-1, 1]) {
+          if (axis === 'x') {
+            for (let r = 1; r <= 6; r++) setV(cx + sign * r, starY, cz, MAT.BRONZE_DARK);
+          } else {
+            for (let r = 1; r <= 6; r++) setV(cx, starY, cz + sign * r, MAT.BRONZE_DARK);
+          }
+        }
+      }
+      setV(cx, starY - 7, cz, MAT.LANTERN);
+      setV(cx, starY + 7, cz, MAT.STAR);
+      setV(cx, y + 56, cz, MAT.STAR);
+      setV(cx, y + 57, cz, MAT.LANTERN);
+
+      // A few lower service lights around the base.
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * TAU + Math.PI / 4;
+        const lx = Math.round(cx + Math.cos(a) * 8.4);
+        const lz = Math.round(cz + Math.sin(a) * 8.4);
+        addStandingLantern(lx, y, lz, false);
+      }
+    }
+
+    /* =========================================================================
+       16 · HIGH FORGE & WINDMILL
+       ========================================================================= */
+
+    function buildForge(anchor) {
+      const y = anchor.y;
+      const x0 = anchor.x - 12, x1 = anchor.x + 12;
+      const z0 = anchor.z - 8, z1 = anchor.z + 8;
+
+      // Main workshop hall.
+      fillBox(x0, y + 1, z0, x1, y + 1, z1, (x, yy, z) => stoneTone(x, yy, z, 1001));
+      for (let yy = y + 2; yy <= y + 13; yy++) {
+        shellBox(x0, yy, z0, x1, yy, z1, (x, yy2, z) => {
+          if (yy2 === y + 2 || yy2 === y + 13) return MAT.BASALT;
+          if (hash3(x, yy2, z, 1002) > 0.86) return MAT.BRONZE_DARK;
+          return hash3(x, yy2, z, 1003) > 0.94 ? MAT.STONE_MOSS : stoneTone(x, yy2, z, 1004);
+        });
+      }
+
+      // Furnace mouth on the hub-facing east wall.
+      for (let yy = y + 3; yy <= y + 8; yy++) {
+        const half = yy <= y + 5 ? 3 : Math.round(3 * Math.sqrt(Math.max(0, 1 - ((yy - y - 5) / 3) ** 2)));
+        for (let dz = -half; dz <= half; dz++) {
+          clearV(x1, yy, anchor.z + dz);
+          if (half > 0) setV(x1 - 1, yy, anchor.z + dz, MAT.FORGE);
+        }
+      }
+      for (let yy = y + 3; yy <= y + 9; yy++) {
+        setV(x1 + 1, yy, anchor.z - 4, MAT.STONE_DARK);
+        setV(x1 + 1, yy, anchor.z + 4, MAT.STONE_DARK);
+      }
+      fillBox(x1 + 1, y + 9, anchor.z - 5, x1 + 1, y + 10, anchor.z + 5, MAT.BRONZE_DARK);
+      forgeLightPosition = { x: x1 - 2, y: y + 6, z: anchor.z };
+
+      // Forge hall roof.
+      const hallRidge = addGableRoof(x0 - 1, z0 - 1, x1 + 1, z1 + 1, y + 14, 'x', 'teal', 1005);
+
+      // Tall chimney with bronze braces.
+      const chimneyX = x0 + 4;
+      const chimneyZ = z0 + 3;
+      const chimneyTop = Math.min(TOP_LIMIT, hallRidge + 18);
+      for (let yy = y + 13; yy <= chimneyTop; yy++) {
+        for (const dx of [0, 1]) {
+          for (const dz of [0, 1]) {
+            setV(chimneyX + dx, yy, chimneyZ + dz, yy % 7 === 0 ? MAT.BRONZE_DARK : MAT.BASALT);
+          }
+        }
+      }
+      fillBox(chimneyX - 1, chimneyTop + 1, chimneyZ - 1, chimneyX + 2, chimneyTop + 2, chimneyZ + 2, MAT.STONE_DARK);
+      setV(chimneyX, chimneyTop + 3, chimneyZ, MAT.PATINA);
+
+      // Small lit windows on the south and west walls.
+      for (const wx of [x0 + 4, x0 + 9, x0 + 15, x0 + 20]) {
+        placeRecessedWindow(wx, y + 6, z1, 0, 1, 1010 + wx, hash3(wx, y, z1, 1011) > 0.2);
+        placeRecessedWindow(wx, y + 11, z1, 0, 1, 1012 + wx, true);
+      }
+      for (const wz of [z0 + 3, z0 + 8, z0 + 13]) {
+        placeRecessedWindow(x0, y + 6, wz, -1, 0, 1013 + wz, true);
+      }
+
+      // Windmill tower at the outer platform corner.
+      const millX = anchor.x + 13;
+      const millZ = anchor.z - 10;
+      for (let yy = y + 1; yy <= y + 27; yy++) {
+        const radius = yy < y + 10 ? 1 : 0;
+        for (let dz = -radius; dz <= radius; dz++) {
+          for (let dx = -radius; dx <= radius; dx++) {
+            setV(millX + dx, yy, millZ + dz, (dx === 0 && dz === 0)
+              ? MAT.STONE_DARK
+              : (yy % 5 === 0 ? MAT.BRONZE_DARK : MAT.WOOD_DARK)
+            );
+          }
+        }
+        if (yy % 4 === 0) {
+          setV(millX + 1, yy, millZ, MAT.BRONZE_DARK);
+          setV(millX - 1, yy, millZ, MAT.BRONZE_DARK);
+          setV(millX, yy, millZ + 1, MAT.BRONZE_DARK);
+          setV(millX, yy, millZ - 1, MAT.BRONZE_DARK);
+        }
+      }
+      fillBox(millX - 2, y + 28, millZ - 2, millX + 2, y + 28, millZ + 2, MAT.STONE_DARK);
+      setV(millX, y + 29, millZ, MAT.BRONZE_DARK);
+
+      // Four static bronze wind sails.
+      const hubY = y + 29;
+      for (let blade = 0; blade < 4; blade++) {
+        const a = blade * (Math.PI / 2) + Math.PI / 4;
+        for (let r = 2; r <= 11; r += 0.7) {
+          const bx = Math.round(millX + Math.cos(a) * r);
+          const by = Math.round(hubY + Math.sin(a) * r);
+          setV(bx, by, millZ, r > 8 ? MAT.PATINA : (r % 3 < 1 ? MAT.GOLD : MAT.BRONZE_DARK));
+          if (r > 4 && r % 3 < 1.2) {
+            const perpX = Math.round(-Math.sin(a) * 1.4);
+            const perpY = Math.round(Math.cos(a) * 1.4);
+            setV(bx + perpX, by + perpY, millZ, MAT.BRONZE_DARK);
+          }
+        }
+      }
+      setV(millX, hubY, millZ, MAT.GOLD);
+      setV(millX, hubY + 1, millZ, MAT.LANTERN);
+
+      // An industrial bronze crane arm projects over the edge; the mast is rooted on deck.
+      const craneX = anchor.x + 9;
+      const craneZ = anchor.z + 6;
+      for (let yy = y + 1; yy <= y + 23; yy++) {
+        setV(craneX, yy, craneZ, yy % 5 === 0 ? MAT.BRONZE_LIGHT : MAT.BRONZE_DARK);
+      }
+      strokeLine(craneX, y + 23, craneZ, craneX + 8, y + 26, craneZ + 4, 0.65, MAT.BRONZE_DARK);
+      for (let d = 1; d <= 8; d++) {
+        setV(Math.round(craneX + d * 0.8), y + 23 + Math.round(d * 0.3), Math.round(craneZ + d * 0.4), MAT.PATINA_DEEP);
+      }
+      for (let yy = y + 16; yy <= y + 24; yy++) {
+        setV(craneX + 8, yy, craneZ + 4, MAT.WOOD_DARK);
+      }
+      const crateY = y + 14;
+      fillBox(craneX + 7, crateY, craneZ + 3, craneX + 9, crateY + 2, craneZ + 5, MAT.WOOD_DARK);
+      setV(craneX + 8, crateY + 3, craneZ + 4, MAT.LANTERN);
+
+      // Furnace-side smith terrace.
+      fillBox(x1 + 2, y, anchor.z - 5, x1 + 5, y, anchor.z + 4, MAT.STONE_LIGHT);
+      addBench(x1 + 4, y + 1, anchor.z + 2, false);
+      addStandingLantern(x1 + 5, y, anchor.z + 4, true);
+    }
+
+    /* =========================================================================
+       17 · DOUBLE-ARCADE ARCHIVE
+       ========================================================================= */
+
+    function buildArchive(anchor) {
+      const y = anchor.y;
+      const x0 = anchor.x - 13, x1 = anchor.x + 13;
+      const z0 = anchor.z - 8, z1 = anchor.z + 8;
+      const frontZ = anchor.z + 10;
+
+      fillBox(x0, y + 1, z0, x1, y + 1, z1, (x, yy, z) => stoneTone(x, yy, z, 1101));
+
+      // Main archive body with two tiers of deep windows.
+      for (let yy = y + 2; yy <= y + 18; yy++) {
+        shellBox(x0, yy, z0, x1, yy, z1, (x, yy2, z) => {
+          if (yy2 === y + 2 || yy2 === y + 9 || yy2 === y + 18) return MAT.BASALT;
+          if (hash3(x, yy2, z, 1102) > 0.89) return MAT.BRONZE_DARK;
+          return hash3(x, yy2, z, 1103) > 0.92 ? MAT.PATINA_DEEP : stoneTone(x, yy2, z, 1104);
+        });
+      }
+      for (let yy = y + 19; yy <= y + 20; yy++) {
+        shellBox(x0, yy, z0, x1, yy, z1, (x, yy2, z) =>
+          hash3(x, yy2, z, 1105) > 0.78 ? MAT.STONE_LIGHT : stoneTone(x, yy2, z, 1106)
+        );
+      }
+
+      // Tall recessed windows / archive niches.
+      for (const yy of [y + 5, y + 14]) {
+        for (let x = x0 + 3; x <= x1 - 3; x += 5) {
+          placeRecessedWindow(x, yy, z1, 0, 1, 1110 + x + yy, hash3(x, yy, z1, 1111) > 0.15);
+          placeRecessedWindow(x, yy, z0, 0, -1, 1112 + x + yy, false);
+        }
+      }
+      for (const yy of [y + 5, y + 14]) {
+        for (let z = z0 + 3; z <= z1 - 3; z += 6) {
+          placeRecessedWindow(x0, yy, z, -1, 0, 1114 + z + yy, true);
+          placeRecessedWindow(x1, yy, z, 1, 0, 1115 + z + yy, true);
+        }
+      }
+
+      // Arched double portico.
+      const columns = [-12, -8, -4, 0, 4, 8, 12].map((dx) => anchor.x + dx);
+      for (const px of columns) {
+        for (let yy = y + 1; yy <= y + 8; yy++) {
+          setV(px, yy, frontZ, yy % 4 === 0 ? MAT.BRONZE_DARK : MAT.STONE_LIGHT);
+        }
+        setV(px, y + 9, frontZ, MAT.BRONZE_DARK);
+        setV(px, y + 10, frontZ, MAT.STONE);
+        for (let yy = y + 11; yy <= y + 17; yy++) {
+          setV(px, yy, frontZ, yy % 5 === 0 ? MAT.BRONZE_DARK : MAT.STONE_LIGHT);
+        }
+        setV(px, y + 18, frontZ, MAT.BRONZE_DARK);
+      }
+
+      // Lower and upper arches between columns.
+      for (let i = 0; i < columns.length - 1; i++) {
+        const xa = columns[i], xb = columns[i + 1];
+        const steps = 12;
+        for (let s = 0; s <= steps; s++) {
+          const t = s / steps;
+          const px = Math.round(lerp(xa, xb, t));
+          const lowerY = y + 9 + Math.round(1.7 * Math.sin(Math.PI * t));
+          const upperY = y + 18 + Math.round(1.6 * Math.sin(Math.PI * t));
+          setV(px, lowerY, frontZ, s % 4 === 0 ? MAT.BRONZE_LIGHT : MAT.STONE);
+          setV(px, upperY, frontZ, s % 4 === 0 ? MAT.BRONZE_LIGHT : MAT.STONE);
+          if (s % 3 === 0) {
+            setV(px, lowerY, frontZ + 1, MAT.BRONZE_DARK);
+            setV(px, upperY, frontZ + 1, MAT.BRONZE_DARK);
+          }
+        }
+      }
+
+      // Mid-level portico floor and roof entablature.
+      fillBox(x0 - 1, y + 10, frontZ - 1, x1 + 1, y + 10, frontZ + 1, (x, yy, z) =>
+        hash3(x, yy, z, 1120) > 0.65 ? MAT.WOOD_DARK : MAT.STONE_DARK
+      );
+      fillBox(x0 - 1, y + 19, frontZ - 1, x1 + 1, y + 19, frontZ + 1, MAT.BRONZE_DARK);
+      fillBox(x0 - 1, y + 20, frontZ, x1 + 1, y + 20, frontZ + 1, MAT.STONE);
+
+      // Central arched doorway and broad entry steps.
+      for (let yy = y + 1; yy <= y + 5; yy++) {
+        const half = yy <= y + 3 ? 2 : Math.round(2 * Math.sqrt(Math.max(0, 1 - ((yy - y - 3) / 3) ** 2)));
+        for (let dx = -half; dx <= half; dx++) {
+          clearV(anchor.x + dx, yy, frontZ);
+          setV(anchor.x + dx, yy, z1, MAT.WINDOW);
+        }
+      }
+      fillBox(anchor.x - 3, y + 1, z1 + 2, anchor.x + 3, y + 1, frontZ - 1, MAT.STONE_LIGHT);
+      fillBox(anchor.x - 2, y + 1, frontZ + 1, anchor.x + 2, y + 1, frontZ + 2, MAT.STONE_LIGHT);
+
+      // Cross-gabled roof over the whole archive.
+      const roofBase = y + 21;
+      const ridgeY = addGableRoof(x0 - 1, z0 - 1, x1 + 1, z1 + 1, roofBase, 'x', 'rust', 1121);
+
+      // End pavilions and roof finials.
+      for (const px of [x0 - 1, x1 + 1]) {
+        for (let yy = y + 2; yy <= y + 19; yy++) {
+          setV(px, yy, z0 - 1, MAT.STONE_LIGHT);
+          setV(px, yy, z1 + 1, MAT.STONE_LIGHT);
+        }
+        setV(px, roofBase + 4, anchor.z, MAT.GOLD);
+        setV(px, roofBase + 5, anchor.z, MAT.LANTERN);
+      }
+
+      // Hanging red archive banners.
+      for (const bx of [x0 + 4, x1 - 4]) {
+        for (let yy = y + 12; yy <= y + 18; yy++) {
+          setV(bx, yy, frontZ + 1, yy % 3 === 0 ? MAT.GOLD : MAT.ROOF_RUST);
+        }
+      }
+
+      // Reading benches and lamps on the platform apron.
+      for (const dx of [-8, 8]) {
+        addBench(anchor.x + dx, y + 1, z0 - 1, true);
+      }
+      addStandingLantern(anchor.x - 14, y, anchor.z + 8, true);
+      addStandingLantern(anchor.x + 14, y, anchor.z + 8, true);
+    }
+
+    /* =========================================================================
+       18 · CANOPY GARDEN · SMALL BRONZE GAZEBO
+       ========================================================================= */
+
+    function buildCanopyGarden(anchor) {
+      const y = anchor.y;
+      disc(anchor.x, anchor.z, y + 1, 7.2, (x, z, d) => d > 6 ? MAT.BRONZE_DARK : stoneTone(x, y + 1, z, 1201), 0);
+      ring(anchor.x, anchor.z, y + 2, 6.0, 4.2, MAT.STONE_LIGHT);
+
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * TAU + 0.2;
+        const px = Math.round(anchor.x + Math.cos(a) * 5);
+        const pz = Math.round(anchor.z + Math.sin(a) * 5);
+        for (let yy = y + 2; yy <= y + 8; yy++) {
+          setV(px, yy, pz, yy === y + 8 ? MAT.GOLD : MAT.BRONZE_DARK);
+        }
+        setV(px, y + 9, pz, MAT.PATINA);
+      }
+      ring(anchor.x, anchor.z, y + 10, 7.1, 3.4, (x, z) => hash3(x, y + 10, z, 1202) > 0.55 ? MAT.PATINA : MAT.BRONZE_DARK);
+      ring(anchor.x, anchor.z, y + 11, 4.6, 2.2, MAT.BRONZE_LIGHT);
+      addHangingLantern(anchor.x, y + 9, anchor.z);
+      setV(anchor.x, y + 12, anchor.z, MAT.STAR);
+
+      // Bronze saplings in four planters.
+      for (let side = 0; side < 4; side++) {
+        const a = (side / 4) * TAU + Math.PI / 4;
+        const px = Math.round(anchor.x + Math.cos(a) * 8.1);
+        const pz = Math.round(anchor.z + Math.sin(a) * 8.1);
+        fillBox(px - 1, y + 1, pz - 1, px + 1, y + 2, pz + 1, MAT.STONE_DARK);
+        for (let yy = y + 3; yy <= y + 7; yy++) {
+          setV(px, yy, pz, MAT.BRONZE_DARK);
+          if (yy % 2 === 0) {
+            setV(px + 1, yy, pz, MAT.PATINA);
+            setV(px - 1, yy, pz, MAT.BRONZE_LIGHT);
+            setV(px, yy, pz + 1, MAT.PATINA);
+          }
+        }
+      }
+
+      for (const dx of [-6, 6]) addBench(anchor.x + dx, y + 1, anchor.z - 1, false);
+      addStandingLantern(anchor.x - 8, y, anchor.z - 7, false);
+      addStandingLantern(anchor.x + 8, y, anchor.z + 7, false);
+    }
+
+    function buildFunctionSites() {
+      buildObservatory(ANCHOR_BY_ID.get('observatory'));
+      buildForge(ANCHOR_BY_ID.get('forge'));
+      buildArchive(ANCHOR_BY_ID.get('archive'));
+      buildCanopyGarden(ANCHOR_BY_ID.get('canopy-garden'));
+    }
+
+    /* =========================================================================
+       19 · UPPER BRANCH GALLERY · A NARROW RING ABOVE THE HUB
+       ========================================================================= */
+
+    const EXTRA_ANCHORS = [];
+
+    function buildUpperGallery() {
+      const gy = 158;
+      for (let layer = 0; layer < 2; layer++) {
+        ring(0, 0, gy - layer, 26 - layer * 0.4, 4.1, (x, z, d) => {
+          if (layer === 0 && (Math.abs(d - 25.2) < 0.7 || Math.abs(d - 5.5) < 0.65)) return MAT.BRONZE_DARK;
+          return hash3(x, gy - layer, z, 1301) > 0.9 ? MAT.PATINA : stoneTone(x, gy - layer, z, 1302);
+        });
+      }
+
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * TAU + 0.16;
+        strokeLine(
+          Math.cos(a) * 3.2, 146.5, Math.sin(a) * 3.2,
+          Math.cos(a) * 24.5, gy - 2, Math.sin(a) * 24.5,
+          0.9, (x, yy, z) => hash3(x, yy, z, 1303) > 0.72 ? MAT.PATINA : MAT.BRONZE_DARK
+        );
+      }
+
+      for (let i = 0; i < 92; i++) {
+        const a = (i / 92) * TAU;
+        if (Math.abs(wrappedAngle(a - 300 * DEG)) < 0.22) continue;
+        const x = Math.round(Math.cos(a) * 25.1);
+        const z = Math.round(Math.sin(a) * 25.1);
+        setV(x, gy + 1, z, i % 4 === 0 ? MAT.BRONZE_LIGHT : MAT.BRONZE_DARK);
+        if (i % 11 === 0) setV(x, gy + 2, z, MAT.LANTERN);
+      }
+
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * TAU + 0.2;
+        setV(Math.round(Math.cos(a) * 20.5), gy, Math.round(Math.sin(a) * 20.5), i % 3 === 0 ? MAT.GOLD : MAT.PATINA_DEEP);
+      }
+
+      for (const angle of [42, 136, 222, 330]) {
+        const x = Math.round(Math.cos(angle * DEG) * 22);
+        const z = Math.round(Math.sin(angle * DEG) * 22);
+        addStandingLantern(x, gy, z, false);
+      }
+
+      clearCircularOpening(0, 0, gy, 25, 300 * DEG, 2.9);
+      EXTRA_ANCHORS.push({
+        id: 'upper-gallery', label: '高枝环廊', code: 'GALLERY', kind: 'gallery',
+        x: 0, z: 0, y: gy, w: 52, d: 52,
+      });
+    }
+
+    /* =========================================================================
+       20 · VERTICAL BRONZE LIFT SHAFTS
+       ========================================================================= */
+
+    const LIFT_RECORDS = [];
+
+    function buildLift(name, angle, radius, baseY, topY, seed) {
+      const cx = Math.round(Math.cos(angle) * radius);
+      const cz = Math.round(Math.sin(angle) * radius);
+      const top = topY + 6;
+
+      // Four openwork columns and repeated cage rings.
+      for (let y = baseY + 1; y <= top; y++) {
+        for (const sx of [-2, 2]) {
+          for (const sz of [-2, 2]) {
+            setV(cx + sx, y, cz + sz, y % 6 === 0 ? MAT.GOLD : MAT.BRONZE_DARK);
+          }
+        }
+      }
+      for (let y = baseY + 2; y <= top; y += 3) {
+        for (let d = -2; d <= 2; d++) {
+          setV(cx + d, y, cz - 2, d % 2 === 0 ? MAT.BRONZE : MAT.BRONZE_DARK);
+          setV(cx + d, y, cz + 2, d % 2 === 0 ? MAT.BRONZE : MAT.BRONZE_DARK);
+          setV(cx - 2, y, cz + d, d % 2 === 0 ? MAT.BRONZE : MAT.BRONZE_DARK);
+          setV(cx + 2, y, cz + d, d % 2 === 0 ? MAT.BRONZE : MAT.BRONZE_DARK);
+        }
+      }
+
+      // Cross-braced faces.
+      for (let y = baseY + 2; y < top - 3; y += 6) {
+        strokeLine(cx - 2, y, cz - 2, cx + 2, y + 4, cz - 2, 0.34, MAT.BRONZE_DARK);
+        strokeLine(cx + 2, y, cz - 2, cx - 2, y + 4, cz - 2, 0.34, MAT.PATINA_DEEP);
+        strokeLine(cx - 2, y, cz + 2, cx + 2, y + 4, cz + 2, 0.34, MAT.PATINA_DEEP);
+        strokeLine(cx + 2, y, cz + 2, cx - 2, y + 4, cz + 2, 0.34, MAT.BRONZE_DARK);
+        strokeLine(cx - 2, y, cz - 2, cx - 2, y + 4, cz + 2, 0.34, MAT.BRONZE_LIGHT);
+        strokeLine(cx + 2, y, cz - 2, cx + 2, y + 4, cz + 2, 0.34, MAT.BRONZE_LIGHT);
+      }
+
+      // Crown frame and pulley.
+      for (let d = -3; d <= 3; d++) {
+        setV(cx + d, top + 1, cz - 3, MAT.BRONZE_DARK);
+        setV(cx + d, top + 1, cz + 3, MAT.BRONZE_DARK);
+        setV(cx - 3, top + 1, cz + d, MAT.BRONZE_DARK);
+        setV(cx + 3, top + 1, cz + d, MAT.BRONZE_DARK);
+      }
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * TAU;
+        setV(Math.round(cx + Math.cos(a) * 2.4), top + 2, Math.round(cz + Math.sin(a) * 2.4), i % 3 === 0 ? MAT.GOLD : MAT.BRONZE_DARK);
+      }
+
+      // Wood-and-stone basket suspended midway through the shaft.
+      const carY = Math.round(lerp(baseY, topY, 0.52 + (seed % 3) * 0.06));
+      fillBox(cx - 1, carY, cz - 1, cx + 1, carY, cz + 1, (x, y, z) =>
+        hash3(x, y, z, 1400 + seed) > 0.7 ? MAT.BRONZE_DARK : MAT.WOOD
+      );
+      for (const sx of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          for (let y = carY + 1; y <= carY + 3; y++) setV(cx + sx, y, cz + sz, MAT.BRONZE_DARK);
+        }
+      }
+      fillBox(cx - 1, carY + 4, cz - 1, cx + 1, carY + 4, cz + 1, MAT.STONE_DARK);
+      setV(cx, carY + 2, cz, MAT.LANTERN);
+
+      // Suspension cable from the pulley to the basket, plus a hanging return line.
+      for (let y = carY + 4; y <= top + 2; y++) {
+        setV(cx, y, cz, y % 5 === 0 ? MAT.GOLD : MAT.BRONZE_DARK);
+      }
+      for (let y = baseY + 1; y < carY; y++) {
+        setV(cx + 1, y, cz + 1, y % 7 === 0 ? MAT.BRONZE_DARK : MAT.WOOD_DARK);
+      }
+
+      // Inlaid landing rings at both thresholds.
+      for (const yy of [baseY + 1, topY + 1]) {
+        for (let i = 0; i < 24; i++) {
+          const a = (i / 24) * TAU;
+          setV(Math.round(cx + Math.cos(a) * 3.4), yy, Math.round(cz + Math.sin(a) * 3.4), i % 4 === 0 ? MAT.GOLD : MAT.PATINA);
+        }
+      }
+
+      LIFT_RECORDS.push({ name, x: cx, z: cz, baseY, topY, carY });
+    }
+
+    function buildLifts() {
+      buildLift('树心升降井 A', 250 * DEG, 21, 98, 130, 1);
+      buildLift('高枝缆车塔 B', 300 * DEG, 25, 130, 158, 2);
+    }
+
+    /* =========================================================================
+       21 · STONE ARCH VIADUCTS · HUB TO FUNCTIONAL QUARTERS
+       ========================================================================= */
+
+    const VIADUCT_RECORDS = [];
+
+    function buildStoneViaduct(a, b, seed) {
+      const A = platformEdgePoint(a, b.x, b.z, 0.5);
+      const B = platformEdgePoint(b, a.x, a.z, 0.5);
+      const dx = B.x - A.x;
+      const dz = B.z - A.z;
+      const distance = Math.hypot(dx, dz);
+      if (distance < 3) return;
+      const ux = dx / distance;
+      const uz = dz / distance;
+      const px = -uz;
+      const pz = ux;
+      const steps = Math.max(10, Math.ceil(distance * 1.8));
+      const deckSamples = [];
+      let pierCount = 0;
+
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const cx = lerp(A.x, B.x, t);
+        const cz = lerp(A.z, B.z, t);
+        const deckY = Math.round(lerp(A.y, B.y, t));
+        const centerX = Math.round(cx);
+        const centerZ = Math.round(cz);
+        deckSamples.push({ t, x: centerX, z: centerZ, y: deckY });
+
+        for (let w = -3; w <= 3; w++) {
+          const x = Math.round(cx + px * w);
+          const z = Math.round(cz + pz * w);
+          setV(x, deckY, z, w === 0 ? MAT.PATINA_DEEP : stoneTone(x, deckY, z, 1500 + seed));
+          setV(x, deckY - 1, z, hash3(x, deckY, z, 1501 + seed) > 0.65 ? MAT.STONE_DARK : MAT.WOOD_DARK);
+        }
+
+        for (const side of [-1, 1]) {
+          const sx = Math.round(cx + px * side * 3.1);
+          const sz = Math.round(cz + pz * side * 3.1);
+          setV(sx, deckY + 1, sz, hash3(sx, deckY, sz, 1502 + seed) > 0.7 ? MAT.STONE_LIGHT : MAT.STONE);
+          if (i % 5 === 0) {
+            setV(sx, deckY + 2, sz, MAT.BRONZE_DARK);
+            if (i % 15 === 0) setV(sx, deckY + 3, sz, MAT.LANTERN);
+          }
+        }
+      }
+
+      const stations = [0.18, 0.44, 0.69, 0.88];
+      const supportStations = [];
+      for (const t of stations) {
+        const cx = Math.round(lerp(A.x, B.x, t));
+        const cz = Math.round(lerp(A.z, B.z, t));
+        const deckY = Math.round(lerp(A.y, B.y, t));
+        const supportY = findSupportBelow(cx, cz, deckY - 2, 0);
+        supportStations.push({ t, x: cx, z: cz, y: deckY, deckY, supportY });
+
+        const pierHeight = supportY === null ? 0 : deckY - 2 - supportY;
+        if (supportY !== null && pierHeight > 0 && pierHeight <= 34) {
+          pierCount++;
+          for (let yy = supportY + 1; yy <= deckY - 2; yy++) {
+            for (let ox = -1; ox <= 1; ox++) {
+              for (let oz = -1; oz <= 1; oz++) {
+                setV(cx + ox, yy, cz + oz, (ox === 0 && oz === 0)
+                  ? MAT.BASALT
+                  : (yy % 8 === 0 ? MAT.BRONZE_DARK : stoneTone(cx + ox, yy, cz + oz, 1503 + seed))
+                );
+              }
+            }
+          }
+          fillBox(cx - 2, supportY + 1, cz - 2, cx + 2, supportY + 2, cz + 2, MAT.STONE_DARK);
+          for (let ox = -1; ox <= 1; ox++) {
+            for (let oz = -1; oz <= 1; oz++) {
+              setV(cx + ox, deckY - 2, cz + oz, MAT.BRONZE_DARK);
+            }
+          }
+        }
+      }
+
+      // Side spandrel walls with a segmented stone arch soffit.
+      const archStations = [
+        { t: 0, x: Math.round(A.x), z: Math.round(A.z), y: A.y, deckY: A.y },
+        ...supportStations,
+        { t: 1, x: Math.round(B.x), z: Math.round(B.z), y: B.y, deckY: B.y },
+      ];
+      for (let seg = 0; seg < archStations.length - 1; seg++) {
+        const p0 = archStations[seg];
+        const p1 = archStations[seg + 1];
+        const spanSteps = Math.max(8, Math.ceil(Math.abs(p1.t - p0.t) * distance * 1.8));
+        const springY = Math.min(p0.y, p1.y) - 5;
+        const crownY = Math.min(p0.y, p1.y) - 1;
+        for (let side of [-1, 1]) {
+          for (let i = 0; i <= spanSteps; i++) {
+            const u = i / spanSteps;
+            const x = Math.round(lerp(p0.x, p1.x, u) + px * side * 3.2);
+            const z = Math.round(lerp(p0.z, p1.z, u) + pz * side * 3.2);
+            const deckY = Math.round(lerp(p0.y, p1.y, u));
+            const archY = Math.round(springY + (crownY - springY) * Math.sin(Math.PI * u));
+            for (let yy = archY; yy <= deckY - 2; yy++) {
+              setV(x, yy, z, yy === archY
+                ? (i % 3 === 0 ? MAT.BRONZE_DARK : MAT.STONE_LIGHT)
+                : stoneTone(x, yy, z, 1504 + seed)
+              );
+            }
+          }
+        }
+      }
+
+      // Hanging lanterns and bronze braces along the outer parapets.
+      for (let i = 5; i < steps; i += 9) {
+        const s = deckSamples[i];
+        const side = (i / 9) % 2 < 1 ? -1 : 1;
+        const lx = Math.round(s.x + px * side * 3.1);
+        const lz = Math.round(s.z + pz * side * 3.1);
+        setV(lx, s.y + 1, lz, MAT.BRONZE_DARK);
+        setV(lx, s.y + 2, lz, MAT.BRONZE_DARK);
+        setV(lx, s.y + 3, lz, MAT.LANTERN);
+        setV(lx, s.y + 4, lz, MAT.BRONZE_DARK);
+      }
+
+      VIADUCT_RECORDS.push({
+        from: a.id, to: b.id,
+        a: { x: Math.round(A.x), y: A.y, z: Math.round(A.z) },
+        b: { x: Math.round(B.x), y: B.y, z: Math.round(B.z) },
+        length: Math.round(distance),
+        piers: pierCount,
+      });
+    }
+
+    function buildViaducts() {
+      const hub = ANCHOR_BY_ID.get('hub');
+      buildStoneViaduct(hub, ANCHOR_BY_ID.get('forge'), 1);
+      buildStoneViaduct(hub, ANCHOR_BY_ID.get('archive'), 2);
+      buildStoneViaduct(hub, ANCHOR_BY_ID.get('observatory'), 3);
+    }
+
+    /* =========================================================================
+       22 · SUSPENDED CATENARY BRIDGES · WOOD, STONE & BRONZE CHAINS
+       ========================================================================= */
+
+    const SUSPENSION_RECORDS = [];
+
+    function buildSuspensionBridge(a, b, seed) {
+      const A = platformEdgePoint(a, b.x, b.z, 0.3);
+      const B = platformEdgePoint(b, a.x, a.z, 0.3);
+      const dx = B.x - A.x;
+      const dz = B.z - A.z;
+      const distance = Math.hypot(dx, dz);
+      if (distance < 4) return;
+      const ux = dx / distance;
+      const uz = dz / distance;
+      const px = -uz;
+      const pz = ux;
+      const sag = clamp(distance * 0.13, 3.2, 8.2);
+      const steps = Math.max(14, Math.ceil(distance * 2.1));
+      const samples = [];
+
+      const deckYAt = (t) => lerp(A.y, B.y, t) - sag * 4 * t * (1 - t);
+
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const cx = lerp(A.x, B.x, t);
+        const cz = lerp(A.z, B.z, t);
+        const deckY = Math.round(deckYAt(t));
+        samples.push({ t, x: cx, z: cz, y: deckY });
+
+        for (let w = -2; w <= 2; w++) {
+          const x = Math.round(cx + px * w);
+          const z = Math.round(cz + pz * w);
+          const plank = ((i + w) % 6 === 0 || w === 0)
+            ? MAT.STONE
+            : (hash3(x, deckY, z, 1600 + seed) > 0.72 ? MAT.WOOD_DARK : MAT.WOOD);
+          setV(x, deckY, z, w === 0 && i % 5 === 0 ? MAT.PATINA_DEEP : plank);
+          setV(x, deckY - 1, z, hash3(x, deckY, z, 1601 + seed) > 0.75 ? MAT.BRONZE_DARK : MAT.WOOD_DARK);
+        }
+
+        for (const side of [-1, 1]) {
+          const x = Math.round(cx + px * side * 2.2);
+          const z = Math.round(cz + pz * side * 2.2);
+          if (i % 2 === 0) setV(x, deckY + 1, z, MAT.BRONZE_DARK);
+          if (i % 9 === 0) {
+            for (let yy = deckY + 1; yy <= deckY + 4; yy++) setV(x, yy, z, MAT.BRONZE_DARK);
+            setV(x, deckY + 5, z, MAT.BRONZE_LIGHT);
+          }
+        }
+      }
+
+      // Tower frames at both thresholds.
+      for (const endpoint of [A, B]) {
+        for (const side of [-1, 1]) {
+          const tx = Math.round(endpoint.x + px * side * 2.3);
+          const tz = Math.round(endpoint.z + pz * side * 2.3);
+          for (let y = endpoint.y + 1; y <= endpoint.y + 6; y++) {
+            setV(tx, y, tz, y === endpoint.y + 6 ? MAT.GOLD : MAT.BRONZE_DARK);
+          }
+          setV(tx, endpoint.y + 1, tz, MAT.BRONZE_LIGHT);
+        }
+        for (let w = -3; w <= 3; w++) {
+          setV(
+            Math.round(endpoint.x + px * w),
+            endpoint.y + 6,
+            Math.round(endpoint.z + pz * w),
+            w === 0 ? MAT.GOLD : MAT.BRONZE_LIGHT
+          );
+        }
+      }
+
+      // Main chains and vertical hangers.
+      for (const side of [-1, 1]) {
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          const cx = lerp(A.x, B.x, t) + px * side * 2.35;
+          const cz = lerp(A.z, B.z, t) + pz * side * 2.35;
+          const cableY = Math.round(lerp(A.y + 6, B.y + 6, t) - sag * 0.58 * 4 * t * (1 - t));
+          setV(cx, cableY, cz, MAT.BRONZE_DARK);
+          if (i % 7 === 0) {
+            for (let y = Math.round(deckYAt(t)) + 2; y < cableY; y++) {
+              setV(cx, y, cz, MAT.BRONZE_DARK);
+            }
+          }
+        }
+      }
+
+      // Lanterns alternating sides of the bridge deck.
+      for (let i = 8; i < steps; i += 11) {
+        const t = i / steps;
+        const side = (i / 11) % 2 < 1 ? -1 : 1;
+        const lx = Math.round(lerp(A.x, B.x, t) + px * side * 2.0);
+        const lz = Math.round(lerp(A.z, B.z, t) + pz * side * 2.0);
+        const ly = Math.round(deckYAt(t));
+        for (let y = ly + 1; y <= ly + 3; y++) setV(lx, y, lz, MAT.BRONZE_DARK);
+        setV(lx, ly + 2, lz, MAT.LANTERN);
+        setV(lx, ly + 4, lz, MAT.GOLD);
+      }
+
+      SUSPENSION_RECORDS.push({
+        from: a.id,
+        to: b.id,
+        a: { x: Math.round(A.x), y: A.y, z: Math.round(A.z) },
+        b: { x: Math.round(B.x), y: B.y, z: Math.round(B.z) },
+        length: Math.round(distance),
+        sag: Math.round(sag),
+      });
+    }
+
+    function buildSuspensionBridges() {
+      const pairs = [
+        ['observatory', 'res-sun'],
+        ['res-sun', 'res-high'],
+        ['res-high', 'archive'],
+        ['forge', 'res-low'],
+        ['res-west', 'canopy-garden'],
+        ['canopy-garden', 'observatory'],
+      ];
+      pairs.forEach(([aId, bId], index) => {
+        buildSuspensionBridge(ANCHOR_BY_ID.get(aId), ANCHOR_BY_ID.get(bId), index + 1);
+      });
+    }
+
+    /* =========================================================================
+       23 · LAYERED CAST-BRONZE LEAF CROWN
+       ========================================================================= */
+
+    function canopyMat(x, y, z, seed, tipness = 0) {
+      const n = hash3(Math.floor(x / 2), Math.floor(y / 2), Math.floor(z / 2), 1700 + seed);
+      if (tipness > 0.78 && n > 0.35) return MAT.GOLD;
+      if (n < 0.14) return MAT.PATINA_DEEP;
+      if (n < 0.48) return MAT.PATINA;
+      if (n < 0.62) return MAT.BRONZE_DARK;
+      if (n < 0.91) return MAT.BRONZE;
+      return MAT.BRONZE_LIGHT;
+    }
+
+    function addLeafCluster(tip) {
+      const cx = Math.round(tip.x);
+      const cy = Math.round(tip.y);
+      const cz = Math.round(tip.z);
+      const size = tip.size;
+      const observatory = ANCHOR_BY_ID.get('observatory');
+      const placeLeaf = (x, y, z, mat) => {
+        if (y > 176 && Math.hypot(x - observatory.x, z - observatory.z) < 11.8) return;
+        setV(x, y, z, mat);
+      };
+      if (!insideGrid(cx, cy, cz)) return;
+
+      if (Number.isFinite(tip.supportX)) {
+        const sx = Math.round(tip.supportX);
+        const sy = Math.round(tip.supportY);
+        const sz = Math.round(tip.supportZ);
+        // A three-cell throat guarantees face contact with the carrying twig,
+        // even when the spline is sampled between two integer centres.
+        for (let dy = -3; dy <= 1; dy++) {
+          setV(sx, sy + dy, sz, MAT.BRONZE_DARK);
+        }
+        strokeLine(sx, sy, sz, cx, cy, cz, 1.35, (x, y, z) =>
+          hash3(x, y, z, 1700 + tip.seed) > 0.7 ? MAT.PATINA : MAT.BRONZE_DARK
+        );
+      }
+
+      // Leaf blades all converge on this small forged heart, so the cluster is
+      // physically held by the branch tip rather than floating in space.
+      stampSphere(cx, cy, cz, 1.15, (x, y, z) => bronzeTone(x, y, z, 1701 + tip.seed));
+
+      const bladeCount = 10 + (tip.seed % 5);
+      for (let blade = 0; blade < bladeCount; blade++) {
+        const a = hash3(tip.seed, blade, 3, 1702) * TAU;
+        const slope = 0.1 + hash3(tip.seed, blade, 7, 1703) * 0.82;
+        const length = size * (0.7 + hash3(tip.seed, blade, 11, 1704) * 0.72);
+        const sideX = -Math.sin(a);
+        const sideZ = Math.cos(a);
+        const start = tip.apex ? 1.0 : 1.15;
+
+        for (let s = start; s <= length; s += 0.58) {
+          const t = clamp(s / length, 0, 1);
+          const bend = Math.sin(t * Math.PI) * (0.8 + size * 0.08);
+          const px = cx + Math.cos(a) * s + (hash3(tip.seed, blade, Math.round(s * 9), 1705) - 0.5) * 0.5;
+          const py = cy + slope * s + bend;
+          const pz = cz + Math.sin(a) * s + (hash3(tip.seed, blade, Math.round(s * 7), 1706) - 0.5) * 0.5;
+          const width = Math.max(0.3, 1.7 * (1 - t) + 0.3);
+          const lobes = Math.max(1, Math.round(width));
+
+          for (let offset = -lobes; offset <= lobes; offset++) {
+            if (offset !== 0 && hash3(Math.round(px + sideX * offset), Math.round(py), Math.round(pz + sideZ * offset), 1707 + tip.seed) < 0.18) continue;
+            const lx = Math.round(px + sideX * offset);
+            const ly = Math.round(py + (offset % 2) * 0.3);
+            const lz = Math.round(pz + sideZ * offset);
+            if (ly > TOP_LIMIT) continue;
+            const mat = canopyMat(lx, ly, lz, tip.seed, t);
+            placeLeaf(lx, ly, lz, mat);
+            if (hash3(lx, ly, lz, 1708) > 0.82) placeLeaf(lx, ly - 1, lz, MAT.PATINA_DEEP);
+          }
+        }
+      }
+
+      // Sparse secondary tips create the characteristic open, airy silhouette.
+      for (let small = 0; small < 3; small++) {
+        const a = hash3(tip.seed, small, 19, 1709) * TAU;
+        const bend = 2.4 + hash3(tip.seed, small, 23, 1710) * 3.1;
+        const ex = clamp(cx + Math.cos(a) * bend, -87, 87);
+        const ez = clamp(cz + Math.sin(a) * bend, -87, 87);
+        const ey = Math.min(TOP_LIMIT, cy + 2 + (small % 2));
+        const stemSteps = Math.ceil(bend * 2);
+        for (let step = 0; step <= stemSteps; step++) {
+          const u = step / stemSteps;
+          placeLeaf(
+            Math.round(lerp(cx, ex, u)),
+            Math.min(TOP_LIMIT, Math.round(lerp(cy, ey, u) + Math.sin(u * Math.PI) * 0.6)),
+            Math.round(lerp(cz, ez, u)),
+            u > 0.78 ? MAT.BRONZE_LIGHT : MAT.BRONZE_DARK
+          );
+        }
+        placeLeaf(Math.round(ex), Math.round(ey), Math.round(ez), small === 0 ? MAT.GOLD : MAT.PATINA);
+        placeLeaf(Math.round(ex) + 1, Math.round(ey), Math.round(ez), MAT.PATINA_DEEP);
+        placeLeaf(Math.round(ex), Math.round(ey) + (small % 2), Math.round(ez) + 1, MAT.BRONZE);
+      }
+    }
+
+    function buildCanopy() {
+      const observatory = ANCHOR_BY_ID.get('observatory');
+      for (const tip of CROWN_TIPS) {
+        // Never lay a bronze leaf curtain in front of the observatory shaft.
+        if (tip.y < 197 && Math.hypot(tip.x - observatory.x, tip.z - observatory.z) < 12.8) continue;
+        addLeafCluster({ ...tip, size: tip.size + 1.15 });
+      }
+
+      // A tight apex tuft around the central mast guarantees Y=200 at the top face.
+      for (let y = 194; y <= 198; y++) {
+        const radius = y === 198 ? 1.2 : 2.2 - (y - 194) * 0.18;
+        for (let i = 0; i < 10; i++) {
+          const a = (i / 10) * TAU + y * 0.41;
+          const x = Math.round(Math.cos(a) * radius);
+          const z = Math.round(Math.sin(a) * radius);
+          setV(x, y, z, y % 3 === 0 ? MAT.GOLD : canopyMat(x, y, z, 1900, 0.7));
+        }
+      }
+      for (const [dx, dz] of [[0, 0], [1, 0], [0, 1], [-1, 0], [0, -1]]) {
+        setV(dx, 199, dz, dx === 0 && dz === 0 ? MAT.GOLD : MAT.PATINA);
+      }
+
+    }
+
+    /* =========================================================================
+       24 · FINAL DETAILS & GENERATION PIPELINE
+       ========================================================================= */
+
+    function addFinishingDetails() {
+      // Small bronze bell clusters suspended from the council ring.
+      for (let i = 0; i < 16; i++) {
+        const a = (i / 16) * TAU + 0.1;
+        const x = Math.round(Math.cos(a) * 34.2);
+        const z = Math.round(Math.sin(a) * 34.2);
+        setV(x, 127, z, MAT.BRONZE_DARK);
+        setV(x, 126, z, MAT.BRONZE_LIGHT);
+        if (i % 4 === 0) setV(x, 125, z, MAT.LANTERN);
+      }
+
+      // Entry plaza incense burners between the southern roots.
+      for (const x of [-13, 13]) {
+        fillBox(x - 1, 8, 19, x + 1, 10, 21, MAT.BRONZE_DARK);
+        fillBox(x - 2, 11, 18, x + 2, 11, 22, MAT.BRONZE);
+        setV(x, 12, 20, MAT.FORGE);
+      }
+
+      // A few scattered masonry fragments at the edge of the foundation.
+      for (let i = 0; i < 26; i++) {
+        const a = hash3(i, 1, 2, 2001) * TAU;
+        const r = 30 + hash3(i, 3, 4, 2002) * 16;
+        const x = Math.round(Math.cos(a) * r);
+        const z = Math.round(Math.sin(a) * r);
+        const y = 7;
+        if (getV(x, y, z) === 0) continue;
+        if (hash3(i, 5, 6, 2003) > 0.65) setV(x, 8, z, MAT.STONE_DARK);
+      }
+    }
+
+    function generateCity() {
+      buildFoundation();
+      buildTrunk();
+      buildRoots();
+      buildSpiralStair();
+      buildTreeBranches();
+      buildHub();
+      buildOuterPlatforms();
+      buildResidentialSites();
+      buildFunctionSites();
+      buildUpperGallery();
+      buildViaducts();
+      buildSuspensionBridges();
+      buildLifts();
+      buildCanopy();
+      addFinishingDetails();
+    }
+
+    /**
+     * One-time 6-neighbour repair pass.
+     * Splines and leaf fans are sampled on continuous curves, so rounded voxel
+     * endpoints can occasionally leave a one-cell diagonal gap. Starting at the
+     * foundation, this pass finds disconnected solid islands, walks the nearest
+     * air corridor back to the main mass, and fills it with a 1-voxel bronze
+     * branchlet. The result is a fully face-connected architectural mass.
+     */
+    function stitchDisconnectedMass() {
+      const connected = new Uint8Array(VOLUME);
+      const solidQueue = new Int32Array(solidCount + 32);
+      let head = 0;
+      let tail = 0;
+      const startIndex = indexOf(0, 0, 0);
+      if (!grid[startIndex]) return 0;
+      connected[startIndex] = 1;
+      solidQueue[tail++] = startIndex;
+
+      while (head < tail) {
+        const index = solidQueue[head++];
+        const y = Math.floor(index / LAYER);
+        const rem = index - y * LAYER;
+        const z = Math.floor(rem / GRID_X) - HALF_Z;
+        const x = rem - (z + HALF_Z) * GRID_X - HALF_X;
+        if (x > -HALF_X) {
+          const n = index - 1;
+          if (grid[n] && !connected[n]) { connected[n] = 1; solidQueue[tail++] = n; }
+        }
+        if (x < HALF_X - 1) {
+          const n = index + 1;
+          if (grid[n] && !connected[n]) { connected[n] = 1; solidQueue[tail++] = n; }
+        }
+        if (z > -HALF_Z) {
+          const n = index - GRID_X;
+          if (grid[n] && !connected[n]) { connected[n] = 1; solidQueue[tail++] = n; }
+        }
+        if (z < HALF_Z - 1) {
+          const n = index + GRID_X;
+          if (grid[n] && !connected[n]) { connected[n] = 1; solidQueue[tail++] = n; }
+        }
+        if (y > 0) {
+          const n = index - LAYER;
+          if (grid[n] && !connected[n]) { connected[n] = 1; solidQueue[tail++] = n; }
+        }
+        if (y < GRID_Y - 1) {
+          const n = index + LAYER;
+          if (grid[n] && !connected[n]) { connected[n] = 1; solidQueue[tail++] = n; }
+        }
+      }
+
+      let hasIsland = false;
+      for (let i = 0; i < VOLUME; i++) {
+        if (grid[i] && !connected[i]) { hasIsland = true; break; }
+      }
+      if (!hasIsland) return 0;
+
+      // Coarse spatial buckets hold one representative voxel of the main mass
+      // per 8³ cell. This keeps the repair linear and avoids a full air BFS.
+      const CELL = 8;
+      const CGX = Math.ceil(GRID_X / CELL);
+      const CGY = Math.ceil((TOP_LIMIT + 1) / CELL);
+      const CGZ = Math.ceil(GRID_Z / CELL);
+      const coarse = new Int32Array(CGX * CGY * CGZ).fill(-1);
+      const coarseIndex = (x, y, z) =>
+        (Math.floor(y / CELL) * CGZ + Math.floor((z + HALF_Z) / CELL)) * CGX +
+        Math.floor((x + HALF_X) / CELL);
+
+      for (let i = 0; i < tail; i++) {
+        const index = solidQueue[i];
+        const y = Math.floor(index / LAYER);
+        const rem = index - y * LAYER;
+        const z = Math.floor(rem / GRID_X) - HALF_Z;
+        const x = rem - (z + HALF_Z) * GRID_X - HALF_X;
+        coarse[coarseIndex(x, y, z)] = index;
+      }
+
+      const componentQueue = new Int32Array(solidCount + 32);
+      let repaired = 0;
+
+      for (let seed = 0; seed < VOLUME; seed++) {
+        if (!grid[seed] || connected[seed]) continue;
+
+        let componentHead = 0;
+        let componentTail = 0;
+        let sumX = 0;
+        let sumY = 0;
+        let sumZ = 0;
+        componentQueue[componentTail++] = seed;
+        connected[seed] = 1;
+
+        while (componentHead < componentTail) {
+          const index = componentQueue[componentHead++];
+          const y = Math.floor(index / LAYER);
+          const rem = index - y * LAYER;
+          const z = Math.floor(rem / GRID_X) - HALF_Z;
+          const x = rem - (z + HALF_Z) * GRID_X - HALF_X;
+          sumX += x;
+          sumY += y;
+          sumZ += z;
+
+          let n;
+          if (x > -HALF_X) {
+            n = index - 1;
+            if (grid[n] && !connected[n]) { connected[n] = 1; componentQueue[componentTail++] = n; }
+          }
+          if (x < HALF_X - 1) {
+            n = index + 1;
+            if (grid[n] && !connected[n]) { connected[n] = 1; componentQueue[componentTail++] = n; }
+          }
+          if (z > -HALF_Z) {
+            n = index - GRID_X;
+            if (grid[n] && !connected[n]) { connected[n] = 1; componentQueue[componentTail++] = n; }
+          }
+          if (z < HALF_Z - 1) {
+            n = index + GRID_X;
+            if (grid[n] && !connected[n]) { connected[n] = 1; componentQueue[componentTail++] = n; }
+          }
+          if (y > 0) {
+            n = index - LAYER;
+            if (grid[n] && !connected[n]) { connected[n] = 1; componentQueue[componentTail++] = n; }
+          }
+          if (y < GRID_Y - 1) {
+            n = index + LAYER;
+            if (grid[n] && !connected[n]) { connected[n] = 1; componentQueue[componentTail++] = n; }
+          }
+        }
+
+        const rootX = Math.round(sumX / componentTail);
+        const rootY = Math.round(sumY / componentTail);
+        const rootZ = Math.round(sumZ / componentTail);
+        const rootCellX = clamp(Math.floor((rootX + HALF_X) / CELL), 0, CGX - 1);
+        const rootCellY = clamp(Math.floor(rootY / CELL), 0, CGY - 1);
+        const rootCellZ = clamp(Math.floor((rootZ + HALF_Z) / CELL), 0, CGZ - 1);
+        let mainIndex = -1;
+        const maxRing = Math.max(CGX, CGY, CGZ);
+
+        searchCoarse:
+        for (let ring = 0; ring <= maxRing; ring++) {
+          for (let dy = -ring; dy <= ring; dy++) {
+            for (let dz = -ring; dz <= ring; dz++) {
+              for (let dx = -ring; dx <= ring; dx++) {
+                if (Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dz)) !== ring) continue;
+                const gx = rootCellX + dx;
+                const gy = rootCellY + dy;
+                const gz = rootCellZ + dz;
+                if (gx < 0 || gx >= CGX || gy < 0 || gy >= CGY || gz < 0 || gz >= CGZ) continue;
+                const candidate = coarse[(gy * CGZ + gz) * CGX + gx];
+                if (candidate >= 0) {
+                  mainIndex = candidate;
+                  break searchCoarse;
+                }
+              }
+            }
+          }
+        }
+        if (mainIndex < 0) continue;
+
+        let mainY = Math.floor(mainIndex / LAYER);
+        let mainRem = mainIndex - mainY * LAYER;
+        let mainZ = Math.floor(mainRem / GRID_X) - HALF_Z;
+        let mainX = mainRem - (mainZ + HALF_Z) * GRID_X - HALF_X;
+
+        let nearestComponent = componentQueue[0];
+        let nearestDistance = Infinity;
+        for (let i = 0; i < componentTail; i++) {
+          const index = componentQueue[i];
+          const y = Math.floor(index / LAYER);
+          const rem = index - y * LAYER;
+          const z = Math.floor(rem / GRID_X) - HALF_Z;
+          const x = rem - (z + HALF_Z) * GRID_X - HALF_X;
+          const manhattan = Math.abs(mainX - x) + Math.abs(mainY - y) + Math.abs(mainZ - z);
+          if (manhattan < nearestDistance) {
+            nearestDistance = manhattan;
+            nearestComponent = index;
+          }
+        }
+
+        let cursor = nearestComponent;
+        let cy = Math.floor(cursor / LAYER);
+        let rem = cursor - cy * LAYER;
+        let cz = Math.floor(rem / GRID_X) - HALF_Z;
+        let cx = rem - (cz + HALF_Z) * GRID_X - HALF_X;
+        let guard = 0;
+        while ((cx !== mainX || cy !== mainY || cz !== mainZ) && guard++ < 512) {
+          const dx = mainX - cx;
+          const dy = mainY - cy;
+          const dz = mainZ - cz;
+          if (Math.abs(dx) >= Math.abs(dy) && Math.abs(dx) >= Math.abs(dz)) cx += Math.sign(dx);
+          else if (Math.abs(dy) >= Math.abs(dz)) cy += Math.sign(dy);
+          else cz += Math.sign(dz);
+
+          const next = indexOf(cx, cy, cz);
+          if (!grid[next]) {
+            grid[next] = MAT.BRONZE_DARK;
+            solidCount++;
+          }
+          connected[next] = 1;
+        }
+        repaired++;
+      }
+      return repaired;
+    }
+
+    const buildStarted = performance.now();
+    generateCity();
+    const stitchedPaths = stitchDisconnectedMass();
+    const buildMs = Math.round(performance.now() - buildStarted);
+
+    /* =========================================================================
+       25 · TYPED-ARRAY SURFACE CULLING
+       ========================================================================= */
+
+    function collectSurfaceIndices() {
+      const groups = [[], [], []];
+      for (let y = 0; y <= TOP_LIMIT; y++) {
+        const yLayer = y * LAYER;
+        for (let z = -HALF_Z; z < HALF_Z; z++) {
+          const row = yLayer + (z + HALF_Z) * GRID_X;
+          for (let x = -HALF_X; x < HALF_X; x++) {
+            const i = row + (x + HALF_X);
+            const mat = grid[i];
+            if (!mat) continue;
+
+            const exposed =
+              x === -HALF_X || grid[i - 1] === 0 ||
+              x === HALF_X - 1 || grid[i + 1] === 0 ||
+              z === -HALF_Z || grid[i - GRID_X] === 0 ||
+              z === HALF_Z - 1 || grid[i + GRID_X] === 0 ||
+              y === 0 || grid[i - LAYER] === 0 ||
+              grid[i + LAYER] === 0;
+
+            if (exposed) groups[MATERIALS[mat].family].push(i);
+          }
+        }
+      }
+      return groups;
+    }
+
+    const surfaceGroups = collectSurfaceIndices();
+    const surfaceCount = surfaceGroups[0].length + surfaceGroups[1].length + surfaceGroups[2].length;
+
+    function voxelTileColor(materialId, x, y, z) {
+      const material = MATERIALS[materialId];
+      const color = new THREE.Color(material.color);
+      const n = hash3(x, y, z, 2100 + materialId);
+      const hue = (hash3(x, y, z, 2110 + materialId) - 0.5) * 0.022;
+      const sat = (hash3(x, y, z, 2120 + materialId) - 0.5) * 0.04;
+      const lit = (n - 0.5) * (material.family === FAMILY.EMISSIVE ? 0.1 : 0.11);
+      color.offsetHSL(hue, sat, lit);
+      if (material.family === FAMILY.BRONZE && hash3(x, y, z, 2130) > 0.86) {
+        color.offsetHSL(-0.025, 0.08, -0.045);
+      }
+      return color;
+    }
+
+    // Expose a 1:1 structured export for three2litematic.
+    function exportVoxelData() {
+      const voxels = [];
+      for (let y = 0; y <= TOP_LIMIT; y++) {
+        const yLayer = y * LAYER;
+        for (let z = -HALF_Z; z < HALF_Z; z++) {
+          const row = yLayer + (z + HALF_Z) * GRID_X;
+          for (let x = -HALF_X; x < HALF_X; x++) {
+            const mat = grid[row + (x + HALF_X)];
+            if (mat) voxels.push([x, y, z, MATERIALS[mat].block]);
+          }
+        }
+      }
+      return {
+        name: '铸枝之城 · The Verdigris Crown',
+        author: 'three2litematic · procedural voxel commission',
+        description:
+          'A 180×215×180 integer voxel world: a 200-voxel-high cast-bronze world tree, ' +
+          '3.35-turn spiral stair, eight great branches, four stone residential quarters, ' +
+          'tree-heart council hub, observatory, high forge, archive, six suspension bridges, ' +
+          'three stone arch viaducts, two openwork bronze lift shafts, and an airy patina crown.',
+        dimensions: { x: GRID_X, y: GRID_Y, z: GRID_Z },
+        groundY: 0,
+        apexY: 200,
+        voxels,
+      };
+    }
+
+    const cityAnchorExport = PLATFORM_ANCHORS.map((anchor) => ({
+      id: anchor.id,
+      label: anchor.label,
+      code: anchor.code,
+      kind: anchor.kind,
+      x: anchor.x,
+      y: anchor.y,
+      z: anchor.z,
+      width: anchor.w,
+      depth: anchor.d,
+    }));
+
+    const cityStats = {
+      grid: { x: GRID_X, y: GRID_Y, z: GRID_Z },
+      occupiedCells: solidCount,
+      surfaceCells: surfaceCount,
+      surfaceByFamily: {
+        bronze: surfaceGroups[0].length,
+        stoneAndWood: surfaceGroups[1].length,
+        emissive: surfaceGroups[2].length,
+      },
+      instancedMeshes: 3,
+      apexTopY: 200,
+      maxVoxelY: modelMaxY,
+      generationMs: buildMs,
+      stitchedPaths,
+      anchors: cityAnchorExport,
+      bridges: VIADUCT_RECORDS.concat(SUSPENSION_RECORDS),
+      lifts: LIFT_RECORDS,
+    };
+
+    window.__CITY_ANCHORS__ = cityAnchorExport.concat(EXTRA_ANCHORS);
+    window.__CITY_STATS__ = cityStats;
+    window.__VOXEL_DATA__ = exportVoxelData();
+
+    /* =========================================================================
+       26 · THREE.JS VIEWPORT · 3 PHYSICAL INSTANCED MESHES
+       ========================================================================= */
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x0b1511, 0.00086);
+
+    const camera = new THREE.PerspectiveCamera(37, window.innerWidth / window.innerHeight, 0.1, 1400);
+    camera.position.set(228, 158, 278);
+
+    let renderer;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+        powerPreference: 'high-performance',
+      });
+    } catch (error) {
+      const loading = document.getElementById('loading');
+      loading.innerHTML = '<div class="error">此浏览器无法创建 WebGL 上下文。该场景需要支持 WebGL 2 的浏览器。</div>';
+      throw error;
+    }
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.6));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.3;
+    renderer.setClearColor(0x000000, 0);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
+    renderer.shadowMap.autoUpdate = false;
+    renderer.shadowMap.needsUpdate = true;
+    renderer.domElement.id = 'voxel-canvas';
+    const stage = document.getElementById('stage');
+    if (stage) stage.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(-8, 100, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.rotateSpeed = 0.52;
+    controls.zoomSpeed = 0.75;
+    controls.panSpeed = 0.6;
+    controls.minDistance = 58;
+    controls.maxDistance = 650;
+    controls.maxPolarAngle = Math.PI * 0.492;
+    controls.autoRotate = false;
+    controls.autoRotateSpeed = 0.36;
+    controls.update();
+
+    const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
+    const bronzeMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      metalness: 0.72,
+      roughness: 0.38,
+      envMapIntensity: 1.45,
+    });
+    const stoneMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      metalness: 0.06,
+      roughness: 0.86,
+      envMapIntensity: 0.88,
+    });
+    const emissiveMaterial = new THREE.MeshStandardMaterial({
+      color: 0x080503,
+      metalness: 0.08,
+      roughness: 0.54,
+      emissive: new THREE.Color(0xff6c20),
+      emissiveIntensity: 2.3,
+    });
+
+    const familyMaterials = [bronzeMaterial, stoneMaterial, emissiveMaterial];
+    const familyNames = ['cast-bronze', 'stone-and-timber', 'emissive-lights'];
+    const matrix = new THREE.Matrix4();
+
+    for (let family = 0; family < 3; family++) {
+      const indices = surfaceGroups[family];
+      const mesh = new THREE.InstancedMesh(boxGeometry, familyMaterials[family], indices.length);
+      mesh.name = `voxel-family-${familyNames[family]}`;
+      mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+      mesh.castShadow = family !== FAMILY.EMISSIVE;
+      mesh.receiveShadow = family !== FAMILY.EMISSIVE;
+      mesh.frustumCulled = false;
+
+      for (let i = 0; i < indices.length; i++) {
+        const index = indices[i];
+        const y = Math.floor(index / LAYER);
+        const layerRemainder = index - y * LAYER;
+        const z = Math.floor(layerRemainder / GRID_X) - HALF_Z;
+        const x = layerRemainder - (z + HALF_Z) * GRID_X - HALF_X;
+        const mat = grid[index];
+
+        matrix.makeTranslation(x + 0.5, y + 0.5, z + 0.5);
+        mesh.setMatrixAt(i, matrix);
+        mesh.setColorAt(i, voxelTileColor(mat, x, y, z));
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      if (typeof mesh.computeBoundingSphere === 'function') mesh.computeBoundingSphere();
+      scene.add(mesh);
+    }
+
+    // A procedural daylight studio gives metalness 0.72 the highlights it needs.
+    function installProceduralEnvironment() {
+      try {
+        if (typeof renderer.setRenderTarget !== 'function') return;
+        const canvas = document.createElement('canvas');
+        canvas.width = 768;
+        canvas.height = 384;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        const sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        sky.addColorStop(0.0, '#09110f');
+        sky.addColorStop(0.42, '#29463c');
+        sky.addColorStop(0.62, '#776447');
+        sky.addColorStop(1.0, '#110c08');
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const sun = ctx.createRadialGradient(540, 112, 8, 540, 112, 130);
+        sun.addColorStop(0, 'rgba(255, 240, 197, 0.98)');
+        sun.addColorStop(0.18, 'rgba(255, 209, 128, 0.62)');
+        sun.addColorStop(1, 'rgba(255, 190, 100, 0)');
+        ctx.fillStyle = sun;
+        ctx.fillRect(390, 0, 320, 270);
+
+        const glow = ctx.createRadialGradient(210, 270, 4, 210, 270, 190);
+        glow.addColorStop(0, 'rgba(103, 156, 131, 0.22)');
+        glow.addColorStop(1, 'rgba(103, 156, 131, 0)');
+        ctx.fillStyle = glow;
+        ctx.fillRect(0, 120, 430, 264);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.mapping = THREE.EquirectangularReflectionMapping;
+        texture.colorSpace = THREE.SRGBColorSpace;
+        const pmrem = new THREE.PMREMGenerator(renderer);
+        pmrem.compileEquirectangularShader();
+        const target = pmrem.fromEquirectangular(texture);
+        scene.environment = target.texture;
+        if ('environmentIntensity' in scene) scene.environmentIntensity = 1.0;
+        texture.dispose();
+        pmrem.dispose();
+      } catch (error) {
+        // Environment reflection is optional; direct lights keep the scene legible.
+      }
+    }
+
+    installProceduralEnvironment();
+
+    const hemisphere = new THREE.HemisphereLight(0xc6dbcd, 0x1d130d, 2.1);
+    scene.add(hemisphere);
+
+    const sunLight = new THREE.DirectionalLight(0xffe2b7, 3.35);
+    sunLight.position.set(118, 258, 154);
+    sunLight.target.position.set(0, 96, 0);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.set(2048, 2048);
+    sunLight.shadow.camera.left = -132;
+    sunLight.shadow.camera.right = 132;
+    sunLight.shadow.camera.top = 154;
+    sunLight.shadow.camera.bottom = -148;
+    sunLight.shadow.camera.near = 30;
+    sunLight.shadow.camera.far = 560;
+    sunLight.shadow.bias = -0.00035;
+    sunLight.shadow.normalBias = 0.55;
+    scene.add(sunLight);
+    scene.add(sunLight.target);
+
+    const rimLight = new THREE.DirectionalLight(0x7bb3a0, 1.35);
+    rimLight.position.set(-185, 116, -210);
+    scene.add(rimLight);
+
+    const frontFill = new THREE.DirectionalLight(0xd7e3d4, 1.18);
+    frontFill.position.set(235, 118, 310);
+    frontFill.target.position.set(-8, 100, 0);
+    scene.add(frontFill);
+    scene.add(frontFill.target);
+
+    scene.add(new THREE.AmbientLight(0x7d9d8d, 0.17));
+
+    const forgeLight = new THREE.PointLight(0xff742b, 460, 58, 2);
+    if (forgeLightPosition) {
+      forgeLight.position.set(forgeLightPosition.x, forgeLightPosition.y, forgeLightPosition.z);
+    } else {
+      forgeLight.position.set(-55, 130, -18);
+    }
+    scene.add(forgeLight);
+
+    const hubLight = new THREE.PointLight(0xffb260, 120, 34, 2);
+    hubLight.position.set(0, 135, 0);
+    scene.add(hubLight);
+
+    const gateLight = new THREE.PointLight(0xffa353, 60, 24, 2);
+    gateLight.position.set(0, 15, 26);
+    scene.add(gateLight);
+
+    const rootLight = new THREE.PointLight(0xffb067, 105, 88, 2);
+    rootLight.position.set(4, 18, 34);
+    scene.add(rootLight);
+
+    for (const [x, y, z] of [[33, 146, 62], [-62, 151, 36], [17, 154, -70]]) {
+      const districtGlow = new THREE.PointLight(0xffa45d, 58, 22, 2);
+      districtGlow.position.set(x, y, z);
+      scene.add(districtGlow);
+    }
+
+    // Populate the UI after generation.
+    const formatCount = (value) => String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    document.getElementById('metric-blocks').textContent = formatCount(solidCount);
+    document.getElementById('metric-surface').textContent = formatCount(surfaceCount);
+    const functionalAnchors = PLATFORM_ANCHORS.filter((anchor) => anchor.kind === 'function');
+    document.getElementById('anchor-list').innerHTML = functionalAnchors.concat(PLATFORM_ANCHORS.filter((anchor) => anchor.kind === 'residence'))
+      .map((anchor) => `
+        <div class="anchor-row">
+          <em>${anchor.code}</em>
+          <strong>${anchor.label}</strong>
+          <span>Y${anchor.y}</span>
+        </div>
+      `).join('');
+
+    let needsRender = true;
+    let firstFrame = true;
+    controls.addEventListener('change', () => { needsRender = true; });
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.6));
+      needsRender = true;
+    });
+
+    const homePosition = new THREE.Vector3(228, 158, 278);
+    const homeTarget = new THREE.Vector3(-8, 100, 0);
+
+    function resetView() {
+      camera.position.copy(homePosition);
+      controls.target.copy(homeTarget);
+      controls.update();
+      needsRender = true;
+    }
+
+    const orbitButton = document.getElementById('btn-orbit');
+    const resetButton = document.getElementById('btn-reset');
+    orbitButton.addEventListener('click', () => {
+      controls.autoRotate = !controls.autoRotate;
+      orbitButton.classList.toggle('active', controls.autoRotate);
+      orbitButton.setAttribute('aria-pressed', String(controls.autoRotate));
+      orbitButton.textContent = controls.autoRotate ? '停止环游' : '自动环游';
+      needsRender = true;
+    });
+    resetButton.addEventListener('click', resetView);
+
+    renderer.setAnimationLoop(() => {
+      controls.update();
+      if (controls.autoRotate) needsRender = true;
+      if (!needsRender) return;
+      renderer.render(scene, camera);
+      needsRender = false;
+      if (firstFrame) {
+        firstFrame = false;
+        const loading = document.getElementById('loading');
+        if (loading) loading.classList.add('hidden');
+        document.body.classList.add('ready');
+      }
+    });
+
+    // One synchronous render ensures screenshot tooling and CLI extraction see the final frame.
+    renderer.render(scene, camera);
+    if (firstFrame) {
+      firstFrame = false;
+      const loading = document.getElementById('loading');
+      if (loading) loading.classList.add('hidden');
+      document.body.classList.add('ready');
+    }
+
+    window.__VIEW__ = {
+      scene,
+      camera,
+      controls,
+      renderer,
+      resetView,
+      stats: cityStats,
+      anchors: window.__CITY_ANCHORS__,
+    };
+
+    console.info(
+      `[Verdigris Crown] ${GRID_X}x${GRID_Y}x${GRID_Z} grid | ` +
+      `${formatCount(solidCount)} solid | ${formatCount(surfaceCount)} surface | ` +
+      `3 InstancedMesh | ${buildMs}ms`
+    );
+  </script>
+</body>
+</html>

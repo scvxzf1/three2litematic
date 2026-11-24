@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
+import * as THREE from 'three';
 
 import {
   TAG,
@@ -46,11 +47,14 @@ import {
   readWorldMetadata,
   renderWorldMapRegion,
   placeStructureInWorld,
+  getStructurePlacementBounds,
   listWorldBackups,
   restoreWorldBackup,
   deleteWorldBackup,
   clearAllWorldBackups,
 } from '../src/cli/mca-world.js';
+import { loadInputSource } from '../src/cli/scene-runner.js';
+import { diagnoseModelInput } from '../src/web/model-diagnostics.js';
 
 const execFileAsync = promisify(execFile);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -138,6 +142,31 @@ function testVerticalPlacementResolution() {
   console.log('✓ 超高建筑自动沉降、顶部留空与高度不足保护校验通过');
 }
 
+function testLargeStructurePlacementBounds() {
+  const blocks = new Array(30_000_000).fill({
+    x: 0,
+    y: 0,
+    z: 0,
+    block: { id: 'minecraft:stone' },
+  });
+  blocks[0] = { x: -100, y: -50, z: -80, block: { id: 'minecraft:stone' } };
+  blocks[blocks.length - 1] = { x: 100, y: 50, z: 80, block: { id: 'minecraft:stone' } };
+  blocks[15_000_000] = { x: -200, y: 900, z: 200, block: { id: 'minecraft:cave_air' } };
+  blocks[15_000_001] = { x: 200, y: 700, z: 250, block: { id: 'minecraft:void_air' } };
+  blocks[15_000_002] = { x: -300, y: 1000, z: -300, block: { id: 'minecraft:air' } };
+
+  const bounds = getStructurePlacementBounds(blocks);
+  assert.equal(bounds.solidBlockCount, 29_999_997);
+  assert.equal(bounds.occupiedBlockCount, 29_999_999);
+  assert.equal(bounds.minStructureY, -50);
+  assert.equal(bounds.maxStructureY, 50);
+  assert.equal(bounds.minModelX, -200);
+  assert.equal(bounds.maxModelX, 200);
+  assert.equal(bounds.minModelZ, -80);
+  assert.equal(bounds.maxModelZ, 250);
+  console.log('✓ 3000 万方块结构边界扫描回归测试通过');
+}
+
 function testNativeVoxelFaceMeshExtraction() {
   const positions = new Float32Array([
     0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0,
@@ -201,6 +230,100 @@ function testNativeVoxelFaceMeshExtraction() {
     'Expected unlit voxel faces to prefer luminous blocks'
   );
   console.log('✓ 合并体素面网格 1:1 无损反推测试通过');
+}
+
+function testGroundBackdropPerSampleClipping() {
+  const scene = new THREE.Scene();
+  for (let x = 0; x < 2; x++) {
+    for (let z = 0; z < 2; z++) {
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(1, 1, 1),
+        new THREE.MeshBasicMaterial({ color: 0x8b5a2b })
+      );
+      mesh.position.set(x, 0.5, z);
+      scene.add(mesh);
+    }
+  }
+
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(1000, 1000),
+    new THREE.MeshBasicMaterial({ color: 0x252429 })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -0.05;
+  scene.add(ground);
+
+  const extracted = extractSceneVoxels(scene, { scaleMode: '1:1' });
+  const xs = extracted.voxels.map((v) => v.x);
+  const zs = extracted.voxels.map((v) => v.z);
+  const width = Math.max(...xs) - Math.min(...xs) + 1;
+  const length = Math.max(...zs) - Math.min(...zs) + 1;
+
+  assert.ok(width < 20, `Giant ground plane must be clipped, got width ${width}`);
+  assert.ok(length < 20, `Giant ground plane must be clipped, got length ${length}`);
+  assert.ok(extracted.voxels.length < 1000, 'Ground plane must not rasterize the whole 1000×1000 area');
+  console.log('✓ 巨型地面背景逐点裁剪测试通过');
+}
+
+function testModelSelfDiagnosisAndInMemoryRepair() {
+  const report = diagnoseModelInput({
+    sourceKind: 'json',
+    voxelData: {
+      name: 'Diagnosis_Test',
+      voxels: [
+        [0, 0, 0, '#8b5a2b'],
+        [0, 0, 0, '#765132'],
+        ['bad', 1, 0, '#ffffff'],
+      ],
+    },
+    currentGrid: null,
+    options: {},
+  });
+
+  assert.ok(report.repair, 'Valid structured entries should produce an in-memory repair candidate');
+  assert.ok(report.findings.some((finding) => finding.text.includes('1 条坐标无效')));
+  assert.ok(report.findings.some((finding) => finding.text.includes('1 个重复坐标')));
+  assert.equal(report.repair.voxelData.voxels.length, 1, 'Repair candidate must filter invalid and duplicate coordinates');
+  assert.equal(report.repair.voxelData.name, 'Diagnosis_Test');
+
+  const scene = new THREE.Scene();
+  scene.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0x8b5a2b })));
+  const fallbackReport = diagnoseModelInput({
+    sourceKind: 'html',
+    voxelData: { voxels: [['bad', 0, 0, '#ffffff']] },
+    capturedScene: scene,
+    currentGrid: null,
+    options: { scaleMode: '1:1', targetSize: 64 },
+  });
+  assert.equal(fallbackReport.repair?.forceScene, true, 'Invalid structured data should fall back to captured geometry');
+  assert.equal(fallbackReport.repair?.options?.scaleMode, 'auto');
+  console.log('✓ 模型自助诊断与内存态修复候选测试通过');
+}
+
+async function testHeadlessPmremShim() {
+  const tempFile = path.join(ROOT, 'test', '.tmp-pmrem.html');
+  const html = `<!DOCTYPE html><html><body><script type="module">
+import * as THREE from 'three';
+const renderer = new THREE.WebGLRenderer();
+const pmrem = new THREE.PMREMGenerator(renderer);
+const envScene = new THREE.Scene();
+envScene.add(new THREE.Mesh(new THREE.SphereGeometry(2), new THREE.MeshBasicMaterial()));
+const target = pmrem.fromScene(envScene);
+const scene = new THREE.Scene();
+scene.environment = target.texture;
+scene.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xff0000 })));
+window.__VOXEL_DATA__ = { name: 'PMREM_Test', voxels: [[0, 0, 0, '#ff0000']] };
+</script></body></html>`;
+
+  await fs.writeFile(tempFile, html, 'utf-8');
+  try {
+    const source = await loadInputSource(tempFile);
+    assert.equal(source.voxelData?.name, 'PMREM_Test');
+    assert.equal(source.voxelData?.voxels?.length, 1);
+  } finally {
+    await fs.rm(tempFile, { force: true });
+  }
+  console.log('✓ CLI 无 GPU PMREM 环境贴图桩测试通过');
 }
 
 function testSemanticMatcherFamiliesAndDither() {
@@ -795,7 +918,11 @@ async function run() {
   await testNbtRoundTrip();
   testCrossBoundaryBitPacking();
   testVerticalPlacementResolution();
+  testLargeStructurePlacementBounds();
   testNativeVoxelFaceMeshExtraction();
+  testGroundBackdropPerSampleClipping();
+  testModelSelfDiagnosisAndInMemoryRepair();
+  await testHeadlessPmremShim();
   testSemanticMatcherFamiliesAndDither();
   await testSlabsOverridesPreviewAndExporters();
   await testEndToEndExamples();

@@ -833,6 +833,40 @@ function canonicalPaletteKey(id, properties) {
   return `${id}[${s}]`;
 }
 
+const STRUCTURE_AIR_BLOCK_IDS = new Set(['minecraft:air', 'minecraft:cave_air', 'minecraft:void_air']);
+
+export function getStructurePlacementBounds(blocks) {
+  const bounds = {
+    minStructureY: Infinity,
+    maxStructureY: -Infinity,
+    minModelX: Infinity,
+    maxModelX: -Infinity,
+    minModelZ: Infinity,
+    maxModelZ: -Infinity,
+    solidBlockCount: 0,
+    occupiedBlockCount: 0,
+  };
+
+  for (const item of blocks) {
+    if (!item?.block) continue;
+
+    if (!STRUCTURE_AIR_BLOCK_IDS.has(item.block.id)) {
+      bounds.minStructureY = Math.min(bounds.minStructureY, item.y);
+      bounds.maxStructureY = Math.max(bounds.maxStructureY, item.y);
+      bounds.solidBlockCount++;
+    }
+    if (item.block.id !== 'minecraft:air') {
+      bounds.minModelX = Math.min(bounds.minModelX, item.x);
+      bounds.maxModelX = Math.max(bounds.maxModelX, item.x);
+      bounds.minModelZ = Math.min(bounds.minModelZ, item.z);
+      bounds.maxModelZ = Math.max(bounds.maxModelZ, item.z);
+      bounds.occupiedBlockCount++;
+    }
+  }
+
+  return bounds;
+}
+
 /**
  * Inject a 3D block grid into an existing Minecraft save world safely with automatic `.mca` backup!
  */
@@ -868,20 +902,16 @@ export async function placeStructureInWorld({
   const baseX = Number.isFinite(rawTargetX) ? Math.floor(rawTargetX) : 0;
   const baseZ = Number.isFinite(rawTargetZ) ? Math.floor(rawTargetZ) : 0;
   const requestedPlacementY = Number.isFinite(rawTargetY) ? Math.floor(rawTargetY) : 64;
-  const solidBlocks = rotated.blocks.filter(
-    (item) => item.block && !['minecraft:air', 'minecraft:cave_air', 'minecraft:void_air'].includes(item.block.id)
-  );
-  if (solidBlocks.length === 0) {
+  const bounds = getStructurePlacementBounds(rotated.blocks);
+  if (bounds.solidBlockCount === 0) {
     throw new Error('当前模型没有可用于确定垂直放置范围的实体方块');
   }
-  const minStructureY = Math.min(...solidBlocks.map((item) => item.y));
-  const maxStructureY = Math.max(...solidBlocks.map((item) => item.y));
   const verticalPlacement = resolveVerticalPlacement({
     requestedY: requestedPlacementY,
     minWorldY: worldInfo.minY,
     maxWorldY: worldInfo.maxY,
-    minStructureY,
-    maxStructureY,
+    minStructureY: bounds.minStructureY,
+    maxStructureY: bounds.maxStructureY,
     topClearanceLayers: Number(topClearanceLayers),
     autoSink: Boolean(autoSink),
   });
@@ -899,18 +929,13 @@ export async function placeStructureInWorld({
     }
     const requestedBottomY = mode === 'solid' ? Math.floor(Number(fillBottomY)) : baseY - 1;
     if (!Number.isFinite(requestedBottomY)) throw new Error('空置域底部 Y 必须是有效整数');
-    const occupied = rotated.blocks.filter((item) => item.block && item.block.id !== 'minecraft:air');
-    if (occupied.length === 0) {
+    if (bounds.occupiedBlockCount === 0) {
       throw new Error('当前模型没有可用于确定空置域范围的实体方块');
     }
-    const minModelX = Math.min(...occupied.map((item) => item.x));
-    const maxModelX = Math.max(...occupied.map((item) => item.x));
-    const minModelZ = Math.min(...occupied.map((item) => item.z));
-    const maxModelZ = Math.max(...occupied.map((item) => item.z));
-    const minChunkX = Math.floor((baseX + minModelX) / 16);
-    const maxChunkX = Math.floor((baseX + maxModelX) / 16);
-    const minChunkZ = Math.floor((baseZ + minModelZ) / 16);
-    const maxChunkZ = Math.floor((baseZ + maxModelZ) / 16);
+    const minChunkX = Math.floor((baseX + bounds.minModelX) / 16);
+    const maxChunkX = Math.floor((baseX + bounds.maxModelX) / 16);
+    const minChunkZ = Math.floor((baseZ + bounds.minModelZ) / 16);
+    const maxChunkZ = Math.floor((baseZ + bounds.maxModelZ) / 16);
     const bottomY = Math.max(worldInfo.minY, requestedBottomY);
     const topY = mode === 'base_hollow'
       ? worldInfo.maxY + 1

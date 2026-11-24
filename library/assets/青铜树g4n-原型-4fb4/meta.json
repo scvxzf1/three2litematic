@@ -1,0 +1,37 @@
+{
+  "id": "青铜树g4n-原型-4fb4",
+  "name": "青铜树g4n-原型",
+  "sourceExt": "html",
+  "tags": [],
+  "favorite": false,
+  "dimensions": {
+    "width": 174,
+    "height": 202,
+    "length": 171
+  },
+  "blockCount": 160062,
+  "materialCount": 78,
+  "config": {
+    "versionPreset": "1.21",
+    "scaleMode": "auto",
+    "targetSize": 64,
+    "useSlabs": true,
+    "hollowInterior": false,
+    "excludeGravity": true,
+    "survivalFriendly": true,
+    "preferScene": false,
+    "preferLightBlocks": false,
+    "brightness": 8,
+    "saturation": 85,
+    "ditherStrength": 15,
+    "disabledBlocks": [],
+    "disabledFamilies": [
+      "wool"
+    ],
+    "blockOverrides": {
+      "minecraft:stone_bricks": "minecraft:calcite"
+    }
+  },
+  "createdAt": 1795170139137,
+  "updatedAt": 1795170139137
+}
