@@ -97,6 +97,12 @@
           <button id="renderStyleBtn" class="hud-pill active" title="切换 Minecraft 预览的颜色与材质显示">
             🧱 材质模式
           </button>
+          <button id="lightingSettingsBtn" class="hud-pill" title="调整当前白昼、黄昏或深夜模式的背景色与光源">
+            ☼ 光照设置
+          </button>
+          <button id="spectatorModeBtn" class="hud-pill" title="进入旁观者预览：拖拽调整视角，WASD 移动，空格上升，Shift 下降">
+            🕹️ 旁观者
+          </button>
           <button id="toggleGridPreviewBtn" class="hud-pill hidden" title="为大蓝图按需生成或释放 3D 网格">
             🧊 渲染 3D 预览
           </button>
@@ -107,6 +113,64 @@
             <button class="hud-seg" data-cam="side" title="右侧视图 (+X)">侧视</button>
             <button class="hud-seg" data-cam="top" title="正顶视平面图 (+Y)">俯视</button>
           </div>
+        </div>
+
+        <div id="lightingSettingsPanel" class="lighting-settings hidden" aria-label="光照与背景设置">
+          <div class="lighting-settings-header">
+            <strong>光照与背景</strong>
+            <button id="resetLightingBtn" class="btn-mini" title="恢复当前模式的默认光照与背景">恢复当前模式</button>
+          </div>
+          <div class="lighting-settings-grid">
+            <label class="color-field">
+              <span>地图背景</span>
+              <input id="lightingBackgroundInput" type="color" value="#0c1018" />
+            </label>
+            <label class="color-field">
+              <span>太阳颜色</span>
+              <input id="lightingSunColorInput" type="color" value="#fffaf0" />
+            </label>
+            <label class="slider-compact">
+              <span>太阳光 <strong id="lightingSunVal">1.05</strong></span>
+              <input id="lightingSunInput" type="range" min="0" max="2" step="0.05" value="1.05" />
+            </label>
+            <label class="slider-compact">
+              <span>环境光 <strong id="lightingAmbientVal">0.90</strong></span>
+              <input id="lightingAmbientInput" type="range" min="0" max="1.5" step="0.05" value="0.9" />
+            </label>
+            <label class="slider-compact">
+              <span>发光强度 <strong id="lightingEmissiveVal">0.65</strong></span>
+              <input id="lightingEmissiveInput" type="range" min="0" max="2.5" step="0.05" value="0.65" />
+            </label>
+            <label class="slider-compact">
+              <span>点光源半径 <strong id="lightingRadiusVal">0.68×</strong></span>
+              <input id="lightingRadiusInput" type="range" min="0.35" max="1.4" step="0.05" value="0.68" />
+            </label>
+          </div>
+          <div class="lighting-settings-note">每个模式独立保存；背景色只影响 Minecraft 预览，不会改写原 Three.js 场景。</div>
+        </div>
+
+        <div id="spectatorSettingsPanel" class="spectator-settings hidden" aria-label="旁观者参数">
+          <div class="spectator-settings-header">
+            <strong>旁观者参数</strong>
+            <span id="spectatorModeHint">拖拽视角 · WASD 移动 · 空格上升 · Shift 下降</span>
+          </div>
+          <label class="spectator-slider">
+            <span>移动速度 <strong id="spectatorSpeedVal">8 格/秒</strong></span>
+            <input id="spectatorSpeedInput" type="range" min="1" max="80" step="1" value="8" />
+          </label>
+          <label class="spectator-slider">
+            <span>视角灵敏度 <strong id="spectatorSensitivityVal">0.003</strong></span>
+            <input id="spectatorSensitivityInput" type="range" min="0.001" max="0.01" step="0.0005" value="0.003" />
+          </label>
+          <label class="spectator-slider">
+            <span>广角 FOV <strong id="spectatorFovVal">60°</strong></span>
+            <input id="spectatorFovInput" type="range" min="30" max="110" step="1" value="60" />
+          </label>
+          <label class="spectator-slider">
+            <span>视距 <strong id="spectatorDistanceVal">2000 格</strong></span>
+            <input id="spectatorDistanceInput" type="range" min="100" max="5000" step="100" value="2000" />
+          </label>
+          <div class="spectator-settings-footer">空格上升 · Shift 下降 · 右键方块传送 · 参数自动保存</div>
         </div>
 
         <div id="mcCanvasHost" class="canvas-host">
@@ -651,6 +715,24 @@
         <span class="hint-text">轻量摘要不做编码；点击下载后才转写，不写入临时文件。</span>
         <div>
           <button id="downloadFormatPreviewBtn" class="btn btn-primary" disabled>📤 下载此格式</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Spectator teleport confirmation -->
+  <div id="spectatorTeleportConfirmModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="spectatorTeleportConfirmTitle">
+    <div class="modal-card spectator-confirm-card">
+      <div class="modal-header">
+        <h3 id="spectatorTeleportConfirmTitle">🧭 确认旁观者传送</h3>
+      </div>
+      <p class="spectator-confirm-copy">是否传送到目标方块上方？</p>
+      <code id="spectatorTeleportConfirmCoords" class="spectator-confirm-coords">X:0  Y:0  Z:0</code>
+      <div class="modal-footer spectator-confirm-actions">
+        <span class="hint-text">Enter 确认 · Esc 取消</span>
+        <div>
+          <button id="cancelSpectatorTeleportBtn" class="btn btn-secondary">取消</button>
+          <button id="confirmSpectatorTeleportBtn" class="btn btn-primary">确认传送</button>
         </div>
       </div>
     </div>

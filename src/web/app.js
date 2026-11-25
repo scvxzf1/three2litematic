@@ -79,6 +79,30 @@ const inspActionHint = document.getElementById('inspActionHint');
 const clearHighlightBtn = document.getElementById('clearHighlightBtn');
 const renderStyleBtn = document.getElementById('renderStyleBtn');
 const materialRenderStyleBtn = document.getElementById('materialRenderStyleBtn');
+const lightingSettingsBtn = document.getElementById('lightingSettingsBtn');
+const lightingSettingsPanel = document.getElementById('lightingSettingsPanel');
+const lightingBackgroundInput = document.getElementById('lightingBackgroundInput');
+const lightingSunColorInput = document.getElementById('lightingSunColorInput');
+const lightingSunInput = document.getElementById('lightingSunInput');
+const lightingSunVal = document.getElementById('lightingSunVal');
+const lightingAmbientInput = document.getElementById('lightingAmbientInput');
+const lightingAmbientVal = document.getElementById('lightingAmbientVal');
+const lightingEmissiveInput = document.getElementById('lightingEmissiveInput');
+const lightingEmissiveVal = document.getElementById('lightingEmissiveVal');
+const lightingRadiusInput = document.getElementById('lightingRadiusInput');
+const lightingRadiusVal = document.getElementById('lightingRadiusVal');
+const resetLightingBtn = document.getElementById('resetLightingBtn');
+const spectatorModeBtn = document.getElementById('spectatorModeBtn');
+const spectatorSettingsPanel = document.getElementById('spectatorSettingsPanel');
+const spectatorModeHint = document.getElementById('spectatorModeHint');
+const spectatorSpeedInput = document.getElementById('spectatorSpeedInput');
+const spectatorSpeedVal = document.getElementById('spectatorSpeedVal');
+const spectatorSensitivityInput = document.getElementById('spectatorSensitivityInput');
+const spectatorSensitivityVal = document.getElementById('spectatorSensitivityVal');
+const spectatorFovInput = document.getElementById('spectatorFovInput');
+const spectatorFovVal = document.getElementById('spectatorFovVal');
+const spectatorDistanceInput = document.getElementById('spectatorDistanceInput');
+const spectatorDistanceVal = document.getElementById('spectatorDistanceVal');
 
 // Layer Slice Bar
 const sliceModeBtn = document.getElementById('sliceModeBtn');
@@ -155,6 +179,10 @@ const editorModal = document.getElementById('editorModal');
 const closeEditorBtn = document.getElementById('closeEditorBtn');
 const codeTextarea = document.getElementById('codeTextarea');
 const applyCodeBtn = document.getElementById('applyCodeBtn');
+const spectatorTeleportConfirmModal = document.getElementById('spectatorTeleportConfirmModal');
+const spectatorTeleportConfirmCoords = document.getElementById('spectatorTeleportConfirmCoords');
+const confirmSpectatorTeleportBtn = document.getElementById('confirmSpectatorTeleportBtn');
+const cancelSpectatorTeleportBtn = document.getElementById('cancelSpectatorTeleportBtn');
 const dropOverlay = document.getElementById('dropOverlay');
 const toastEl = document.getElementById('toast');
 
@@ -217,6 +245,99 @@ const clearAllBackupsBtn = document.getElementById('clearAllBackupsBtn');
 const backupSizeHint = document.getElementById('backupSizeHint');
 const worldBackupList = document.getElementById('worldBackupList');
 
+const SPECTATOR_SETTINGS_KEY = 't2l_spectator_settings';
+const DEFAULT_SPECTATOR_SETTINGS = {
+  speed: 8,
+  sensitivity: 0.003,
+  fov: 60,
+  viewDistance: 2000,
+};
+
+const LIGHTING_SETTINGS_KEY = 't2l_lighting_settings';
+const DEFAULT_LIGHTING_SETTINGS = {
+  day: {
+    background: '#0c1018',
+    sunColor: '#fffaf0',
+    sunIntensity: 1.05,
+    ambientIntensity: 0.9,
+    emissiveIntensity: 0.65,
+    radiusScale: 0.68,
+    sunPosition: [65, 115, 80],
+    fillColor: '#9ab8ff',
+    fillIntensity: 0.35,
+    skyColor: '#eef6ff',
+    groundColor: '#556070',
+  },
+  sunset: {
+    background: '#15101d',
+    sunColor: '#ff8c42',
+    sunIntensity: 1.35,
+    ambientIntensity: 0.5,
+    emissiveIntensity: 1.15,
+    radiusScale: 0.78,
+    sunPosition: [95, 34, 48],
+    fillColor: '#6366f1',
+    fillIntensity: 0.28,
+    skyColor: '#ffb48a',
+    groundColor: '#2d2342',
+  },
+  night: {
+    background: '#05070d',
+    sunColor: '#7aa2f7',
+    sunIntensity: 0.24,
+    ambientIntensity: 0.22,
+    emissiveIntensity: 1.55,
+    radiusScale: 0.95,
+    sunPosition: [-55, 90, -45],
+    fillColor: '#334155',
+    fillIntensity: 0.1,
+    skyColor: '#3b4c7a',
+    groundColor: '#0d111c',
+  },
+};
+
+function cloneLightingSettings(source) {
+  return Object.fromEntries(Object.entries(source).map(([mode, settings]) => [mode, { ...settings, sunPosition: [...settings.sunPosition] }]));
+}
+
+function loadLightingSettings() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(LIGHTING_SETTINGS_KEY) || '{}');
+    const defaults = cloneLightingSettings(DEFAULT_LIGHTING_SETTINGS);
+    for (const mode of Object.keys(defaults)) {
+      if (!parsed?.[mode]) continue;
+      for (const key of ['background', 'sunColor', 'sunIntensity', 'ambientIntensity', 'emissiveIntensity', 'radiusScale']) {
+        if (parsed[mode][key] !== undefined) defaults[mode][key] = parsed[mode][key];
+      }
+    }
+    return defaults;
+  } catch {
+    return cloneLightingSettings(DEFAULT_LIGHTING_SETTINGS);
+  }
+}
+
+function saveLightingSettings() {
+  try {
+    localStorage.setItem(LIGHTING_SETTINGS_KEY, JSON.stringify(state.lightingSettings));
+  } catch {
+    // Ignore storage restrictions.
+  }
+}
+
+function loadSpectatorSettings() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SPECTATOR_SETTINGS_KEY) || '{}');
+    return {
+      speed: Math.min(80, Math.max(1, Number(parsed.speed) || DEFAULT_SPECTATOR_SETTINGS.speed)),
+      sensitivity: Math.min(0.01, Math.max(0.001, Number(parsed.sensitivity) || DEFAULT_SPECTATOR_SETTINGS.sensitivity)),
+      fov: Math.min(110, Math.max(30, Number(parsed.fov) || DEFAULT_SPECTATOR_SETTINGS.fov)),
+      viewDistance: Math.min(5000, Math.max(100, Number(parsed.viewDistance) || DEFAULT_SPECTATOR_SETTINGS.viewDistance)),
+    };
+  } catch {
+    return { ...DEFAULT_SPECTATOR_SETTINGS };
+  }
+}
+
 // ==================== Application State ====================
 const state = {
   sourceKind: 'none', // 'html' | 'json' | 'litematic'
@@ -256,7 +377,10 @@ const state = {
   pickerCategory: 'all',
 
   cameraSync: true,
+  spectatorMode: false,
+  spectatorSettings: loadSpectatorSettings(),
   lightingMode: 'day',
+  lightingSettings: loadLightingSettings(),
   renderStyle: (() => {
     try {
       return localStorage.getItem('t2l_render_style') === 'color' ? 'color' : 'material';
@@ -315,7 +439,7 @@ function uint8ToBase64(u8) {
 const mcScene = new THREE.Scene();
 mcScene.background = new THREE.Color('#0c1018');
 
-const mcCamera = new THREE.PerspectiveCamera(48, 1, 0.1, 2500);
+const mcCamera = new THREE.PerspectiveCamera(state.spectatorSettings.fov, 1, 0.1, state.spectatorSettings.viewDistance);
 mcCamera.position.set(36, 30, 36);
 
 const mcRenderer = new THREE.WebGLRenderer({
@@ -330,6 +454,141 @@ mcCanvasHost.appendChild(mcRenderer.domElement);
 const mcControls = new OrbitControls(mcCamera, mcRenderer.domElement);
 mcControls.enableDamping = true;
 mcControls.dampingFactor = 0.1;
+
+const spectatorKeys = new Set();
+let spectatorYaw = 0;
+let spectatorPitch = 0;
+let spectatorDragging = false;
+let spectatorLastPointer = { x: 0, y: 0 };
+let spectatorLastFrame = performance.now();
+let pendingSpectatorTeleport = null;
+
+function getSpectatorDirection() {
+  const cosPitch = Math.cos(spectatorPitch);
+  return new THREE.Vector3(
+    Math.sin(spectatorYaw) * cosPitch,
+    Math.sin(spectatorPitch),
+    Math.cos(spectatorYaw) * cosPitch
+  ).normalize();
+}
+
+function captureSpectatorAngles() {
+  const direction = mcCamera.getWorldDirection(new THREE.Vector3()).normalize();
+  spectatorYaw = Math.atan2(direction.x, direction.z);
+  spectatorPitch = Math.asin(THREE.MathUtils.clamp(direction.y, -1, 1));
+}
+
+function updateSpectatorCameraRotation() {
+  const direction = getSpectatorDirection();
+  mcCamera.lookAt(mcCamera.position.clone().add(direction));
+  mcControls.target.copy(mcCamera.position).add(direction.multiplyScalar(Math.max(1, state.mcBaseDist)));
+  requestRender();
+  if (state.cameraSync) syncMcToSource();
+}
+
+function saveSpectatorSettings() {
+  try {
+    localStorage.setItem(SPECTATOR_SETTINGS_KEY, JSON.stringify(state.spectatorSettings));
+  } catch {
+    // Ignore storage restrictions.
+  }
+}
+
+function updateSpectatorSettingsUI() {
+  const settings = state.spectatorSettings;
+  spectatorSpeedInput.value = String(settings.speed);
+  spectatorSpeedVal.textContent = `${settings.speed} 格/秒`;
+  spectatorSensitivityInput.value = String(settings.sensitivity);
+  spectatorSensitivityVal.textContent = settings.sensitivity.toFixed(4);
+  spectatorFovInput.value = String(settings.fov);
+  spectatorFovVal.textContent = `${settings.fov}°`;
+  spectatorDistanceInput.value = String(settings.viewDistance);
+  spectatorDistanceVal.textContent = `${settings.viewDistance} 格`;
+}
+
+function applySpectatorCameraSettings() {
+  mcCamera.fov = state.spectatorSettings.fov;
+  mcCamera.far = state.spectatorSettings.viewDistance;
+  mcCamera.updateProjectionMatrix();
+  updateSpectatorSettingsUI();
+  requestRender();
+}
+
+function enterSpectatorMode() {
+  if (state.spectatorMode) return;
+  captureSpectatorAngles();
+  state.spectatorMode = true;
+  mcControls.enabled = false;
+  spectatorLastFrame = performance.now();
+  spectatorModeBtn.classList.add('active');
+  spectatorSettingsPanel.classList.remove('hidden');
+  mcCanvasHost.classList.add('spectator-active');
+  spectatorModeHint.textContent = '拖拽视角 · WASD 移动 · 空格上升 · Shift 下降';
+  applySpectatorCameraSettings();
+  updateSpectatorCameraRotation();
+  showToast('已进入旁观者模式：拖拽视角，WASD 移动，空格上升，Shift 下降');
+}
+
+function exitSpectatorMode({ silent = false } = {}) {
+  if (!state.spectatorMode) return;
+  state.spectatorMode = false;
+  spectatorDragging = false;
+  spectatorKeys.clear();
+  mcControls.enabled = true;
+  spectatorModeBtn.classList.remove('active');
+  spectatorSettingsPanel.classList.add('hidden');
+  mcCanvasHost.classList.remove('spectator-active');
+  mcCamera.fov = state.spectatorSettings.fov;
+  mcCamera.far = Math.max(2000, state.currentGrid ? Math.max(state.currentGrid.width, state.currentGrid.height, state.currentGrid.length) * 12 : 2000);
+  mcCamera.updateProjectionMatrix();
+  requestRender();
+  if (!silent) showToast('已退出旁观者模式');
+}
+
+function updateSpectatorMovement(now) {
+  if (!state.spectatorMode) return false;
+  const delta = Math.min(0.05, Math.max(0, (now - spectatorLastFrame) / 1000));
+  spectatorLastFrame = now;
+
+  const forward = getSpectatorDirection();
+  const right = new THREE.Vector3(Math.cos(spectatorYaw), 0, -Math.sin(spectatorYaw)).normalize();
+  const movement = new THREE.Vector3();
+  if (spectatorKeys.has('w')) movement.add(forward);
+  if (spectatorKeys.has('s')) movement.sub(forward);
+  if (spectatorKeys.has('a')) movement.add(right);
+  if (spectatorKeys.has('d')) movement.sub(right);
+  if (spectatorKeys.has('space')) movement.y += 1;
+  if (spectatorKeys.has('shift')) movement.y -= 1;
+
+  if (movement.lengthSq() === 0) return false;
+  mcCamera.position.add(movement.normalize().multiplyScalar(state.spectatorSettings.speed * delta));
+  updateSpectatorCameraRotation();
+  return true;
+}
+
+function closeSpectatorTeleportConfirm(showToastMessage = true) {
+  pendingSpectatorTeleport = null;
+  spectatorTeleportConfirmModal.classList.add('hidden');
+  if (showToastMessage) showToast('已取消传送');
+}
+
+function openSpectatorTeleportConfirm(voxel) {
+  pendingSpectatorTeleport = voxel;
+  spectatorTeleportConfirmCoords.textContent = `X:${voxel.x}  Y:${voxel.y}  Z:${voxel.z}`;
+  spectatorTeleportConfirmModal.classList.remove('hidden');
+  confirmSpectatorTeleportBtn.focus();
+}
+
+function confirmSpectatorTeleport() {
+  if (!pendingSpectatorTeleport) return;
+  const { x, y, z } = pendingSpectatorTeleport;
+  mcCamera.position.set(x + 0.5, y + 1.2, z + 0.5);
+  updateSpectatorCameraRotation();
+  closeSpectatorTeleportConfirm(false);
+  showToast(`已传送到方块 X:${x} Y:${y} Z:${z}`);
+}
+
+updateSpectatorSettingsUI();
 
 const hemiLight = new THREE.HemisphereLight(0xeef6ff, 0x556070, 0.9);
 mcScene.add(hemiLight);
@@ -619,7 +878,9 @@ function animateCameraToPreset(presetName) {
 function animateMcPreview(now) {
   requestAnimationFrame(animateMcPreview);
 
-  if (camTween) {
+  if (state.spectatorMode) {
+    updateSpectatorMovement(now);
+  } else if (camTween) {
     const t = Math.min(1, (now - camTween.startTime) / camTween.duration);
     const ease = 1 - Math.pow(1 - t, 3);
     mcCamera.position.lerpVectors(camTween.startPos, camTween.endPos, ease);
@@ -648,46 +909,33 @@ requestAnimationFrame(animateMcPreview);
 
 // ==================== Lighting Presets & Clustered Emissive PointLights ====================
 function rebuildEmissivePointLights(blocks) {
-  while (pointLightGroup.children.length > 0) {
-    const l = pointLightGroup.children.pop();
-    if (l.dispose) l.dispose();
-  }
-
-  if (state.lightingMode === 'day' || !blocks || blocks.length === 0) return;
+  pointLightGroup.clear();
+  if (!blocks || blocks.length === 0) return;
   const emissives = blocks.filter((b) => b.block.category === 'emissive');
   if (emissives.length === 0) return;
 
-  const clusters = [];
-  const clusterRadiusSq = 81;
-
+  const settings = state.lightingSettings[state.lightingMode];
+  const clusterSize = Math.max(4, Math.round(8 * settings.radiusScale));
+  const clusterMap = new Map();
   for (const item of emissives) {
-    let joined = null;
-    for (const c of clusters) {
-      const dx = item.x - c.sumX / c.count;
-      const dy = item.y - c.sumY / c.count;
-      const dz = item.z - c.sumZ / c.count;
-      if (dx * dx + dy * dy + dz * dz <= clusterRadiusSq) {
-        joined = c;
-        break;
-      }
-    }
-    if (joined) {
-      joined.sumX += item.x + 0.5;
-      joined.sumY += item.y + 0.5;
-      joined.sumZ += item.z + 0.5;
-      joined.count += 1;
-    } else if (clusters.length < 6) {
-      clusters.push({
-        sumX: item.x + 0.5,
-        sumY: item.y + 0.5,
-        sumZ: item.z + 0.5,
-        count: 1,
-        hex: item.block.hex,
-      });
-    }
+    const key = `${Math.floor(item.x / clusterSize)}:${Math.floor(item.y / clusterSize)}:${Math.floor(item.z / clusterSize)}`;
+    const cluster = clusterMap.get(key) || {
+      sumX: 0,
+      sumY: 0,
+      sumZ: 0,
+      count: 0,
+      hex: item.block.hex,
+    };
+    cluster.sumX += item.x + 0.5;
+    cluster.sumY += item.y + 0.5;
+    cluster.sumZ += item.z + 0.5;
+    cluster.count += 1;
+    clusterMap.set(key, cluster);
   }
 
-  const baseStrength = state.lightingMode === 'night' ? 18 : 9;
+  const clusters = [...clusterMap.values()].sort((a, b) => b.count - a.count).slice(0, 8);
+  const modeScale = state.lightingMode === 'night' ? 1 : state.lightingMode === 'sunset' ? 0.7 : 0.35;
+  const baseStrength = 8 * settings.emissiveIntensity * modeScale;
   const maxDim = state.currentGrid
     ? Math.max(state.currentGrid.width, state.currentGrid.height, state.currentGrid.length, 16)
     : 24;
@@ -697,7 +945,7 @@ function rebuildEmissivePointLights(blocks) {
     const pl = new THREE.PointLight(
       new THREE.Color(c.hex),
       baseStrength * boost,
-      Math.max(20, maxDim * 0.68),
+      Math.max(20, maxDim * settings.radiusScale),
       1.6
     );
     pl.position.set(c.sumX / c.count, c.sumY / c.count, c.sumZ / c.count);
@@ -705,41 +953,70 @@ function rebuildEmissivePointLights(blocks) {
   }
 }
 
+function updateLightingSettingsUI() {
+  const settings = state.lightingSettings[state.lightingMode];
+  lightingBackgroundInput.value = settings.background;
+  lightingSunColorInput.value = settings.sunColor;
+  lightingSunInput.value = String(settings.sunIntensity);
+  lightingSunVal.textContent = Number(settings.sunIntensity).toFixed(2);
+  lightingAmbientInput.value = String(settings.ambientIntensity);
+  lightingAmbientVal.textContent = Number(settings.ambientIntensity).toFixed(2);
+  lightingEmissiveInput.value = String(settings.emissiveIntensity);
+  lightingEmissiveVal.textContent = Number(settings.emissiveIntensity).toFixed(2);
+  lightingRadiusInput.value = String(settings.radiusScale);
+  lightingRadiusVal.textContent = `${Number(settings.radiusScale).toFixed(2)}×`;
+}
+
 function applyLightingPreset(mode) {
   state.lightingMode = mode;
-  if (mode === 'night') {
-    mcScene.background.set('#05070d');
-    hemiLight.color.setHex(0x3b4c7a);
-    hemiLight.groundColor.setHex(0x0d111c);
-    hemiLight.intensity = 0.22;
-    sunLight.color.setHex(0x7aa2f7);
-    sunLight.intensity = 0.24;
-    sunLight.position.set(-55, 90, -45);
-    fillLight.color.setHex(0x334155);
-    fillLight.intensity = 0.1;
-  } else if (mode === 'sunset') {
-    mcScene.background.set('#15101d');
-    hemiLight.color.setHex(0xffb48a);
-    hemiLight.groundColor.setHex(0x2d2342);
-    hemiLight.intensity = 0.5;
-    sunLight.color.setHex(0xff8c42);
-    sunLight.intensity = 1.35;
-    sunLight.position.set(95, 34, 48);
-    fillLight.color.setHex(0x6366f1);
-    fillLight.intensity = 0.28;
-  } else {
-    mcScene.background.set('#0c1018');
-    hemiLight.color.setHex(0xeef6ff);
-    hemiLight.groundColor.setHex(0x556070);
-    hemiLight.intensity = 0.9;
-    sunLight.color.setHex(0xfffaf0);
-    sunLight.intensity = 1.05;
-    sunLight.position.set(65, 115, 80);
-    fillLight.color.setHex(0x9ab8ff);
-    fillLight.intensity = 0.35;
-  }
+  const settings = state.lightingSettings[mode];
+  mcScene.background.set(settings.background);
+  hemiLight.color.set(settings.skyColor);
+  hemiLight.groundColor.set(settings.groundColor);
+  hemiLight.intensity = settings.ambientIntensity;
+  sunLight.color.set(settings.sunColor);
+  sunLight.intensity = settings.sunIntensity;
+  sunLight.position.fromArray(settings.sunPosition);
+  fillLight.color.set(settings.fillColor);
+  fillLight.intensity = settings.fillIntensity;
+  updateLightingSettingsUI();
   if (state.currentGrid && !state.previewDeferred) renderGridInViewport(state.currentGrid, false);
+  else rebuildEmissivePointLights(state.currentGrid?.blocks || []);
+  requestRender();
 }
+
+let lightingRefreshRaf = 0;
+function scheduleLightingRefresh() {
+  if (lightingRefreshRaf) return;
+  lightingRefreshRaf = requestAnimationFrame(() => {
+    lightingRefreshRaf = 0;
+    applyLightingPreset(state.lightingMode);
+  });
+}
+
+function updateActiveLightingSetting(key, value) {
+  state.lightingSettings[state.lightingMode][key] = value;
+  saveLightingSettings();
+  scheduleLightingRefresh();
+}
+
+lightingSettingsBtn.addEventListener('click', () => {
+  const visible = lightingSettingsPanel.classList.toggle('hidden');
+  lightingSettingsBtn.classList.toggle('active', !visible);
+});
+lightingBackgroundInput.addEventListener('input', (event) => updateActiveLightingSetting('background', event.target.value));
+lightingSunColorInput.addEventListener('input', (event) => updateActiveLightingSetting('sunColor', event.target.value));
+lightingSunInput.addEventListener('input', (event) => updateActiveLightingSetting('sunIntensity', Number(event.target.value)));
+lightingAmbientInput.addEventListener('input', (event) => updateActiveLightingSetting('ambientIntensity', Number(event.target.value)));
+lightingEmissiveInput.addEventListener('input', (event) => updateActiveLightingSetting('emissiveIntensity', Number(event.target.value)));
+lightingRadiusInput.addEventListener('input', (event) => updateActiveLightingSetting('radiusScale', Number(event.target.value)));
+resetLightingBtn.addEventListener('click', () => {
+  const mode = state.lightingMode;
+  state.lightingSettings[mode] = { ...DEFAULT_LIGHTING_SETTINGS[mode], sunPosition: [...DEFAULT_LIGHTING_SETTINGS[mode].sunPosition] };
+  saveLightingSettings();
+  applyLightingPreset(mode);
+  showToast(`已恢复${mode === 'day' ? '白昼' : mode === 'sunset' ? '黄昏' : '深夜'}光照默认值`);
+});
 
 function fitCameraToGrid(grid) {
   const cx = grid.width * 0.5;
@@ -754,7 +1031,7 @@ function fitCameraToGrid(grid) {
   state.mcBaseDist = mcCamera.position.distanceTo(mcControls.target);
 
   mcCamera.near = 0.1;
-  mcCamera.far = Math.max(2000, maxDim * 12);
+  mcCamera.far = state.spectatorMode ? state.spectatorSettings.viewDistance : Math.max(2000, maxDim * 12);
   mcCamera.updateProjectionMatrix();
   mcControls.update();
 
@@ -841,6 +1118,7 @@ function renderGridInViewport(grid, resetCam = false) {
   const built = buildMergedVoxelScene(grid, {
     lightingMode: state.lightingMode,
     renderStyle: state.renderStyle,
+    emissiveIntensity: state.lightingSettings[state.lightingMode].emissiveIntensity,
   });
 
   state.cellLookup = built.cellLookup;
@@ -997,8 +1275,31 @@ function setHighlightedBlockId(blockId, sampleInfo = null) {
 
 mcCanvasHost.addEventListener('pointerdown', (e) => {
   pointerDownPos = { x: e.clientX, y: e.clientY };
+  if (state.spectatorMode && e.button === 0) {
+    spectatorDragging = true;
+    spectatorLastPointer = { x: e.clientX, y: e.clientY };
+    mcCanvasHost.setPointerCapture?.(e.pointerId);
+  }
+});
+mcCanvasHost.addEventListener('contextmenu', (e) => {
+  if (state.spectatorMode) e.preventDefault();
 });
 mcCanvasHost.addEventListener('pointermove', (e) => {
+  if (state.spectatorMode) {
+    if (spectatorDragging && (e.buttons & 1) !== 0) {
+      const dx = e.clientX - spectatorLastPointer.x;
+      const dy = e.clientY - spectatorLastPointer.y;
+      spectatorLastPointer = { x: e.clientX, y: e.clientY };
+      spectatorYaw -= dx * state.spectatorSettings.sensitivity;
+      spectatorPitch = THREE.MathUtils.clamp(
+        spectatorPitch - dy * state.spectatorSettings.sensitivity,
+        -Math.PI / 2 + 0.02,
+        Math.PI / 2 - 0.02
+      );
+      updateSpectatorCameraRotation();
+    }
+    return;
+  }
   if (e.buttons !== 0) return;
   pendingHoverX = e.clientX;
   pendingHoverY = e.clientY;
@@ -1017,6 +1318,20 @@ mcCanvasHost.addEventListener('pointerleave', () => {
   if (!state.highlightedBlockId) voxelInspector.classList.add('hidden');
 });
 mcCanvasHost.addEventListener('pointerup', (e) => {
+  if (state.spectatorMode) {
+    if (e.button === 2) {
+      const hit = pickVoxelAtClientPos(e.clientX, e.clientY);
+      if (hit) {
+        openSpectatorTeleportConfirm(hit);
+      } else {
+        showToast('右键未命中方块');
+      }
+    }
+    if (e.button !== 0) return;
+    spectatorDragging = false;
+    mcCanvasHost.releasePointerCapture?.(e.pointerId);
+    return;
+  }
   if (e.button !== 0) return;
   if (Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y) > 4) return;
   const hit = pickVoxelAtClientPos(e.clientX, e.clientY);
@@ -1028,6 +1343,11 @@ mcCanvasHost.addEventListener('pointerup', (e) => {
   }
 });
 clearHighlightBtn.addEventListener('click', () => setHighlightedBlockId(null));
+confirmSpectatorTeleportBtn.addEventListener('click', confirmSpectatorTeleport);
+cancelSpectatorTeleportBtn.addEventListener('click', () => closeSpectatorTeleportConfirm());
+spectatorTeleportConfirmModal.addEventListener('click', (e) => {
+  if (e.target === spectatorTeleportConfirmModal) closeSpectatorTeleportConfirm();
+});
 
 // ==================== Config Snapshot Serialization (Per-Asset & Presets) ====================
 function serializeCurrentConfig() {
@@ -2534,6 +2854,29 @@ syncCamBtn.addEventListener('click', () => {
   }
 });
 
+spectatorModeBtn.addEventListener('click', () => {
+  if (state.spectatorMode) exitSpectatorMode();
+  else enterSpectatorMode();
+});
+
+const spectatorSettingInputs = [
+  [spectatorSpeedInput, 'speed', (value) => `${value} 格/秒`],
+  [spectatorSensitivityInput, 'sensitivity', (value) => Number(value).toFixed(4)],
+  [spectatorFovInput, 'fov', (value) => `${value}°`],
+  [spectatorDistanceInput, 'viewDistance', (value) => `${value} 格`],
+];
+for (const [input, key, format] of spectatorSettingInputs) {
+  input.addEventListener('input', () => {
+    const value = Number(input.value);
+    state.spectatorSettings[key] = value;
+    const label = input.parentElement.querySelector('strong');
+    if (label) label.textContent = format(value);
+    saveSpectatorSettings();
+    if (key === 'fov' || key === 'viewDistance') applySpectatorCameraSettings();
+    else requestRender();
+  });
+}
+
 for (const btn of document.querySelectorAll('[data-light]')) {
   btn.addEventListener('click', () => {
     document.querySelectorAll('[data-light]').forEach((b) => b.classList.remove('active'));
@@ -2544,6 +2887,7 @@ for (const btn of document.querySelectorAll('[data-light]')) {
 
 for (const btn of document.querySelectorAll('[data-cam]')) {
   btn.addEventListener('click', () => {
+    if (state.spectatorMode) exitSpectatorMode({ silent: true });
     document.querySelectorAll('[data-cam]').forEach((b) => b.classList.remove('active'));
     btn.classList.add('active');
     animateCameraToPreset(btn.dataset.cam);
@@ -2591,6 +2935,31 @@ window.addEventListener('keydown', (e) => {
   }
   const tag = document.activeElement?.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  if (!spectatorTeleportConfirmModal.classList.contains('hidden')) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      confirmSpectatorTeleport();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      closeSpectatorTeleportConfirm();
+    }
+    return;
+  }
+  if (state.spectatorMode && e.code === 'Space') {
+    e.preventDefault();
+    spectatorKeys.add('space');
+    return;
+  }
+  if (state.spectatorMode && e.key === 'Shift') {
+    e.preventDefault();
+    spectatorKeys.add('shift');
+    return;
+  }
+  if (state.spectatorMode && ['w', 'a', 's', 'd'].includes(e.key.toLowerCase())) {
+    e.preventDefault();
+    spectatorKeys.add(e.key.toLowerCase());
+    return;
+  }
   if (e.key === 'ArrowUp') {
     e.preventDefault();
     stepLayer(1);
@@ -2609,6 +2978,14 @@ window.addEventListener('keydown', (e) => {
     }
   }
 });
+
+window.addEventListener('keyup', (e) => {
+  const key = e.key.toLowerCase();
+  if (['w', 'a', 's', 'd'].includes(key)) spectatorKeys.delete(key);
+  if (e.code === 'Space') spectatorKeys.delete('space');
+  if (e.key === 'Shift') spectatorKeys.delete('shift');
+});
+window.addEventListener('blur', () => spectatorKeys.clear());
 
 resetCameraBtn.addEventListener('click', () => {
   if (state.currentGrid) fitCameraToGrid(state.currentGrid);
@@ -4262,6 +4639,7 @@ commitPlaceBtn.addEventListener('click', async () => {
 // ==================== Boot ====================
 async function initApp() {
   resizeMcViewport();
+  applyLightingPreset(state.lightingMode);
   renderFamilyChipsUI();
   await Promise.all([refreshPresetsList(''), refreshLibraryAssets()]);
 

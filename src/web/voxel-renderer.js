@@ -363,7 +363,7 @@ function isFullOpaqueBlock(blk) {
  */
 export function buildMergedVoxelScene(
   grid,
-  { lightingMode = 'day', renderStyle = 'material' } = {}
+  { lightingMode = 'day', renderStyle = 'material', emissiveIntensity = null } = {}
 ) {
   const { width, height, length, blocks } = grid;
   const volume = width * height * length;
@@ -478,7 +478,7 @@ export function buildMergedVoxelScene(
 
   const emissiveGeo = emissiveBuilder.toBufferGeometry();
   if (emissiveGeo) {
-    const emIntensity = lightingMode === 'night' ? 1.55 : lightingMode === 'sunset' ? 1.15 : 0.65;
+    const emIntensity = emissiveIntensity ?? (lightingMode === 'night' ? 1.55 : lightingMode === 'sunset' ? 1.15 : 0.65);
     const mat = new THREE.MeshStandardMaterial({
       map: tex,
       vertexColors: true,
